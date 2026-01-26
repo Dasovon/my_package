@@ -30,6 +30,7 @@ install(DIRECTORY launch config
 # Install Python scripts
 install(PROGRAMS
   my_robot_bringup/motor_controller.py
+  my_robot_bringup/teleop_keyboard.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
