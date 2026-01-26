@@ -27,4 +27,10 @@ install(DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Install Python scripts
+install(PROGRAMS
+  my_robot_bringup/motor_controller.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
