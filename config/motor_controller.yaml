@@ -1,0 +1,12 @@
+motor_controller:
+  ros__parameters:
+    # Robot geometry
+    wheel_base: 0.179  # Distance between wheels (meters) - UPDATE THIS
+    
+    # Speed limits
+    max_speed: 0.5     # Maximum linear velocity (m/s) - conservative for testing
+    
+    # PWM settings (from our testing)
+    min_duty_cycle: 60   # Minimum PWM for reliable starting
+    max_duty_cycle: 100  # Maximum PWM (cap lower for safety if needed)
+    pwm_frequency: 1000  # PWM frequency (Hz)
