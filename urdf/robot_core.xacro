@@ -1,0 +1,134 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!-- Define some properties (easy to change later) -->
+    <xacro:property name="base_width" value="0.450"/>
+    <xacro:property name="base_length" value="0.179"/>
+    <xacro:property name="base_height" value="0.022"/>
+    
+    <xacro:property name="wheel_radius" value="0.084"/>
+    <xacro:property name="wheel_width" value="0.058"/>
+
+    <!-- Materials for visualization -->
+    <material name="white">
+        <color rgba="1 1 1 1"/>
+    </material>
+    
+    <material name="blue">
+        <color rgba="0.2 0.2 1 0.9"/>
+    </material>
+    
+    <material name="black">
+        <color rgba="0.1 0.1 0.1 1"/>
+    </material>
+
+    <!-- Base footprint (on the ground) -->
+    <link name="base_footprint"/>
+
+    <!-- Base link (robot center, elevated above ground) -->
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <box size="${base_length} ${base_width} ${base_height}"/>
+            </geometry>
+            <material name="blue"/>
+        </visual>
+
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="5.0"/>
+            <inertia ixx="0.1" ixy="0.0" ixz="0.0" 
+                     iyy="0.1" iyz="0.0" izz="0.1"/>
+        </inertial>
+
+        <collision>
+            <geometry>
+                <box size="${base_length} ${base_width} ${base_height}"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <!-- Joint connecting footprint to base_link -->
+    <joint name="base_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Placeholder wheels (won't move yet, but good for visualization) -->
+    <link name="left_wheel">
+        <visual>
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+            </geometry>
+            <material name="black"/>
+            <origin xyz="0 0 0.095" rpy="${pi/2} 0 0"/>
+        </visual>
+
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="0.5"/>
+            <inertia ixx="0.01" ixy="0.0" ixz="0.0" 
+                     iyy="0.01" iyz="0.0" izz="0.01"/>
+        </inertial>
+
+        <collision>
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+            </geometry>
+            <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        </collision>
+
+    </link>
+    
+    <link name="right_wheel">
+        <visual>
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+            </geometry>
+            <material name="black"/>
+            <origin xyz="0 0 0.095" rpy="${pi/2} 0 0"/>
+        </visual>
+
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <mass value="0.5"/>
+            <inertia ixx="0.01" ixy="0.0" ixz="0.0" 
+                     iyy="0.01" iyz="0.0" izz="0.01"/>
+        </inertial>
+
+        <collision>
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+            </geometry>
+            <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        </collision>
+
+    </link>
+
+    <joint name="left_wheel_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="left_wheel"/>
+        <origin xyz="0 ${base_width/2 + wheel_width/2} -${wheel_radius}" rpy="0 0 0"/>
+    </joint>
+    
+    <joint name="right_wheel_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="right_wheel"/>
+        <origin xyz="0 -${base_width/2 + wheel_width/2} -${wheel_radius}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Gazebo-specific materials (RViz colors don't work in Gazebo) -->
+    <gazebo reference="base_link">
+        <material>Gazebo/Blue</material>
+    </gazebo>
+    
+    <gazebo reference="left_wheel">
+        <material>Gazebo/Black</material>
+    </gazebo>
+    
+    <gazebo reference="right_wheel">
+        <material>Gazebo/Black</material>
+    </gazebo>
+
+</robot>
