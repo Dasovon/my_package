@@ -2,21 +2,29 @@
 
 **Status:** Base ROS 2 system configured ✅ | Motor control implemented ✅ | Sensor integration in progress 🚧
 
-A battery-powered mobile robot built on a hoverboard drive base with RPLIDAR, BNO055 IMU, and Intel RealSense depth camera. Running ROS 2 Humble on Ubuntu 22.04.
+A ROS 2 mobile robot project running on Ubuntu 22.04 with ROS 2 Humble. Currently using a small DC gearmotor dev robot for testing, with plans to migrate to a hoverboard drive platform.
 
 ---
 
 ## Hardware
 
-- **Robot Computer:** Raspberry Pi 4/5 (hostname: `hoverbot`)
+### Current Dev Robot
+- **Robot Computer:** Raspberry Pi 4/5 (hostname: `hoverbot`, IP: 192.168.86.33)
 - **Development PC:** Ubuntu 22.04 desktop (hostname: `dev`)
-- **Drive System:** Hoverboard motor controller (planned)
-- **Sensors:**
+- **Drive System:** L298N H-bridge with DG01D-E gearmotors (1:48 ratio, 576 ticks/rev encoders)
+- **Chassis:** Small DC gearmotor chassis (165mm wheelbase, 65mm wheel diameter)
+- **Current Sensors:**
   - RPLIDAR A1 (2D lidar) - *Integration in progress*
-  - BNO055 IMU - *Planned*
-  - Intel RealSense D435i depth camera - *Planned*
+  - Wheel encoders (quadrature, built into DG01D-E motors)
+
+### Future Hoverboard Platform (Planned)
+- **Drive System:** Hoverboard motor controller
+- **Additional Sensors:**
+  - BNO055 IMU
+  - Intel RealSense D435i depth camera
 
 See [docs/HARDWARE.md](docs/HARDWARE.md) for complete bill of materials and specifications.
+See [docs/ROBOT_PHYSICAL_CHARACTERISTICS.md](docs/ROBOT_PHYSICAL_CHARACTERISTICS.md) for current robot dimensions and wiring.
 
 ---
 

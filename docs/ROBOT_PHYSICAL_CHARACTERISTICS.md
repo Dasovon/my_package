@@ -20,11 +20,11 @@ This document summarizes the robot's physical characteristics and the current Ra
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| Wheel radius | 0.032375 m | 32.375 mm |
-| Wheel diameter | 0.06475 m | 64.75 mm |
+| Wheel radius | 0.0325 m | 32.5 mm |
+| Wheel diameter | 0.065 m | 65 mm |
 | Wheel width | 0.058 m | 58 mm |
 | Wheel base | 0.165 m | Distance between wheel centers |
-| Wheel circumference | 0.2034 m | π × diameter |
+| Wheel circumference | 0.2042 m | π × diameter |
 
 ### Encoders (DG01D-E)
 
@@ -34,7 +34,7 @@ This document summarizes the robot's physical characteristics and the current Ra
 | Gear ratio | 1:48 | Internal gearbox |
 | Encoder PPR | 12 | Pulses per revolution (before gearing) |
 | Ticks per revolution | 576 | 12 PPR × 48 gear ratio |
-| Distance per tick | 0.353 mm | Wheel circumference / 576 |
+| Distance per tick | 0.354 mm | Wheel circumference / 576 |
 
 ---
 
@@ -95,7 +95,7 @@ These values are configured in the following files:
 motor_controller:
   ros__parameters:
     wheel_base: 0.165
-    wheel_diameter: 0.06475
+    wheel_diameter: 0.065
     encoder_ticks_per_rev: 576
     motor_enable_a_pin: 17
     motor_in1_pin: 27
@@ -115,7 +115,7 @@ motor_controller:
 <xacro:property name="base_width" value="0.165"/>
 <xacro:property name="base_length" value="0.179"/>
 <xacro:property name="base_height" value="0.022"/>
-<xacro:property name="wheel_radius" value="0.032375"/>
+<xacro:property name="wheel_radius" value="0.0325"/>
 <xacro:property name="wheel_width" value="0.058"/>
 ```
 
