@@ -13,6 +13,7 @@ A battery-powered mobile robot that currently runs on a small DC gearmotor chass
 - **Drive System (current):** Small DC gearmotor chassis + L298N
 - **Drive System (next):** Hoverboard motor controller (planned)
 - **Sensors:**
+  - RPLIDAR A1 (2D lidar) - *Installed, integration next*
   - RPLIDAR A1 (2D lidar) - *Current*
   - Wheel encoders - *Current*
   - BNO055 IMU - *Planned*
