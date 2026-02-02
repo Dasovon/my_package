@@ -8,9 +8,9 @@
 
 ## Executive Summary
 
-This ROS 2 bringup package is organized and already includes core nodes for motor control, teleoperation, launch files, and hardware documentation. The biggest gaps are in package metadata (placeholders and duplicate dependencies), configuration consistency between URDF and motor parameters, and operational hardening for GPIO access. Addressing these items will improve portability, correctness, and readiness for deployment.
+This repository provides a solid base for ROS 2 bringup of a hoverboard-based robot, including motor control, teleop, lidar launch, URDF, and extensive documentation. The most significant gaps are in package metadata completeness, dependency declarations, and configuration consistency between runtime parameters and the URDF. Addressing these will improve correctness, portability, and deployment readiness.
 
-**Overall Rating:** 6.5/10 — Solid foundation with several correctness and polish gaps.
+**Overall Rating:** 6.5/10 — Strong foundation with several correctness and polish gaps.
 
 ---
 
@@ -20,20 +20,20 @@ This ROS 2 bringup package is organized and already includes core nodes for moto
 
 | Issue | Severity | Notes |
 | --- | --- | --- |
-| GPIO pins hardcoded | Medium | Pin assignments are fixed in code; should be parameters for portability. |
-| GPIO warnings suppressed | Low | `GPIO.setwarnings(False)` hides useful runtime feedback. |
-| No GPIO error handling | Medium | `setup_gpio()` has no exception handling or permission checks. |
-| Unused PID params | Medium | Config includes PID gains, but control is open-loop. |
-| Odometry based on encoder deltas only | Low | No sanity checks or overflow handling for ticks. |
+| GPIO pins hardcoded | Medium | Pin assignments are fixed in code; consider ROS params for portability. |
+| GPIO warnings suppressed | Low | `GPIO.setwarnings(False)` hides useful diagnostics. |
+| No GPIO permission guard | Medium | Missing explicit check/exception handling for non-RPi or missing permissions. |
+| PID params unused | Medium | Config declares PID gains, but controller is open-loop. |
+| Encoder overflow/sanity checks | Low | Tick deltas are used directly without bounds checking. |
 
-**Recommendation:** Parameterize pin mappings, add a permission check or exception handling around GPIO init, and either implement PID control or remove unused parameters from the YAML to reduce confusion.
+**Recommendation:** Parameterize pin mappings, add startup checks for GPIO availability/permissions, and either implement PID control or remove unused parameters to avoid confusion.
 
 ### 1.2 `my_robot_bringup/teleop_keyboard.py`
 
 | Issue | Severity | Notes |
 | --- | --- | --- |
-| Broad exception handling | Low | Errors are logged but not classified; consider more specific handling. |
-| Terminal restore on abrupt exit | Medium | Terminal state restores in `finally`, but a hard kill could still leave the terminal dirty. |
+| Broad exception handling | Low | `except Exception` is used in the main loop. |
+| Terminal restore on hard kill | Medium | `finally` restores the terminal, but `kill -9` still leaves it dirty. |
 
 ---
 
@@ -47,14 +47,15 @@ This ROS 2 bringup package is organized and already includes core nodes for moto
 | Placeholder license | High | `TODO: License declaration` is invalid. |
 | Generic maintainer email | Medium | `your_email@example.com` should be updated. |
 | Duplicate dependencies | Medium | `rplidar_ros` and `xacro` are declared twice. |
+| Missing GPIO dependency | Medium | `RPi.GPIO` is used but not declared as a ROS dependency. |
 
-**Recommendation:** Fill out metadata fields, remove duplicates, and add a LICENSE file that matches the declared license.
+**Recommendation:** Fill out metadata fields, remove duplicates, and add a LICENSE file to match the declared license. Add the GPIO package dependency in the install instructions or ROS dependency list.
 
 ### 2.2 `CMakeLists.txt`
 
 | Issue | Severity | Notes |
 | --- | --- | --- |
-| Lint checks disabled | Low | Lint configuration skips cpplint/copyright. |
+| Lint checks disabled | Low | cpplint and copyright checks are skipped. |
 
 ---
 
@@ -67,11 +68,11 @@ This ROS 2 bringup package is organized and already includes core nodes for moto
 | `config/motor_controller.yaml` | 0.06475 m | 0.165 m |
 | `urdf/robot_core.xacro` | 0.168 m (radius 0.084 m) | 0.450 m |
 
-**Impact:** Odometry, simulation, and control calculations will diverge between URDF and runtime parameters.
+**Impact:** Odometry, simulation, and control calculations will diverge between the URDF and runtime parameters.
 
 ### 3.2 Unused PID Gains
 
-`speed_kp`, `speed_ki`, and `speed_kd` are declared but unused in the motor controller. Either remove or implement closed-loop control.
+`speed_kp`, `speed_ki`, and `speed_kd` are declared but unused in the motor controller. Either remove them or implement closed-loop control.
 
 ---
 
@@ -79,7 +80,7 @@ This ROS 2 bringup package is organized and already includes core nodes for moto
 
 ### 4.1 GPIO Permissions
 
-The motor controller requires GPIO access and currently assumes permissions are correct. Add a startup check and a clear error message for unsupported environments (non-Raspberry Pi or missing GPIO permissions).
+The motor controller assumes GPIO access without checks. Add a startup check with a clear error message for unsupported environments (non-RPi or missing GPIO permissions).
 
 ### 4.2 `.gitignore` Coverage
 
@@ -128,3 +129,4 @@ __pycache__/
 | `package.xml` | Package metadata |
 | `CMakeLists.txt` | Build configuration |
 | `.gitignore` | Ignore rules |
+| `docs/` | Setup, hardware, troubleshooting docs |
