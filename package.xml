@@ -3,21 +3,61 @@
 <package format="3">
   <name>my_robot_bringup</name>
   <version>0.0.0</version>
-  <description>ROS 2 bringup package for Hoverbot mobile robot</description>
-  <maintainer email="your_email@example.com">ryan</maintainer>
-  <license>Apache-2.0</license>
+  <description>ROS 2 bringup package for the Hoverbot mobile robot platform.</description>
+  <maintainer email="trickey19@gmail.com">ryan</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
-  <exec_depend>demo_nodes_cpp</exec_depend>
-  <exec_depend>demo_nodes_py</exec_depend>
-  <exec_depend>tf2_ros</exec_depend>
+  <!-- Core ROS 2 Python dependencies -->
   <exec_depend>rclpy</exec_depend>
+
+  <!-- Message type dependencies -->
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
 
+  <!-- TF and transforms -->
+  <exec_depend>tf2_ros</exec_depend>
+
+  <!-- Launch system -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- URDF and robot description -->
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+
+  <!-- Visualization -->
+
+  <!-- NOTE: Visualization tools (RViz2) intentionally excluded -->
+  <!-- RViz2 is only needed on development machines for visualization -->
+  <!-- Install manually on dev machine: sudo apt install ros-humble-rviz2 -->
+  
+  <!-- Hardware drivers -->
+  <exec_depend>rplidar_ros</exec_depend>
+  <exec_depend>python3-rpi.gpio</exec_depend>
+  
+  <!-- Simulation -->
+  
+  <!-- NOTE: Gazebo simulation dependencies intentionally excluded -->
+  <!-- Gazebo is only needed on development machines, not robot hardware -->
+  <!-- Install manually on dev machine: sudo apt install ros-humble-gazebo-ros-pkgs -->
+  
+
+  <!-- Python utilities -->
+  <exec_depend>ament_index_python</exec_depend>
+
+  <!-- Demo nodes (for testing) -->
+  <exec_depend>demo_nodes_cpp</exec_depend>
+  <exec_depend>demo_nodes_py</exec_depend>
+
+  <!-- Testing dependencies -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+ 
   <export>
     <build_type>ament_cmake</build_type>
   </export>

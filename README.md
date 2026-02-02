@@ -1,6 +1,6 @@
 # Hoverbot - ROS 2 Mobile Robot Project
 
-**Status:** Base ROS 2 system configured ✅ | Sensor integration in progress 🚧
+**Status:** Base ROS 2 system configured ✅ | Motor control implemented ✅ | Sensor integration in progress 🚧
 
 A battery-powered mobile robot built on a hoverboard drive base with RPLIDAR, BNO055 IMU, and Intel RealSense depth camera. Running ROS 2 Humble on Ubuntu 22.04.
 
@@ -29,16 +29,19 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for complete bill of materials and spec
 - [x] Workspace setup (`dev_ws`, `robot_ws`)
 - [x] Package structure with launch files and config
 - [x] Git workflow for multi-machine development
+- [x] TF tree and URDF robot description
+- [x] L298N motor controller node with encoder support
+- [x] Keyboard teleoperation node
+- [x] Gazebo simulation setup
 
 ### 🚧 In Progress
 - [ ] RPLIDAR A1 integration
-- [ ] TF tree and URDF
 - [ ] RViz visualization
+- [ ] Hardware testing and calibration
 
 ### 📋 Planned
 - [ ] BNO055 IMU integration
 - [ ] RealSense camera integration
-- [ ] Motor controller bringup
 - [ ] SLAM and navigation
 - [ ] Autonomous behavior
 
@@ -93,8 +96,11 @@ You should see "Hello World" messages flowing from hoverbot to dev.
 
 - **[SETUP.md](docs/SETUP.md)** - Complete setup guide from scratch
 - **[HARDWARE.md](docs/HARDWARE.md)** - Bill of materials and specifications
+- **[HARDWARE_REQUIREMENTS.md](docs/HARDWARE_REQUIREMENTS.md)** - Detailed hardware specifications
 - **[TODO.md](docs/TODO.md)** - Project roadmap and next steps
 - **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[L298N_MOTOR_CONTROL.md](docs/L298N_MOTOR_CONTROL.md)** - L298N motor driver guide
+- **[ENCODER_ODOMETRY_COMPLETE.md](docs/ENCODER_ODOMETRY_COMPLETE.md)** - Encoder odometry setup
 
 ---
 
@@ -104,18 +110,39 @@ You should see "Hello World" messages flowing from hoverbot to dev.
 my_robot_bringup/
 ├── README.md                    # This file
 ├── package.xml                  # ROS 2 package metadata
-├── CMakeLists.txt              # Build configuration
+├── CMakeLists.txt               # Build configuration
+├── LICENSE                      # MIT License
 ├── config/                      # Parameter files
-│   └── my_controllers.yaml
+│   ├── motor_controller.yaml    # Motor controller parameters
+│   ├── my_controllers.yaml      # General controller config
+│   └── rplidar.yaml             # RPLIDAR configuration
 ├── launch/                      # Launch files
-│   ├── talker.launch.py
-│   ├── listener.launch.py
-│   └── service_example.launch.py
+│   ├── talker.launch.py         # Demo publisher node
+│   ├── listener.launch.py       # Demo subscriber node
+│   ├── service_example.launch.py
+│   ├── rplidar.launch.py        # RPLIDAR bringup
+│   ├── rsp.launch.py            # Robot state publisher
+│   ├── motor_control.launch.py  # Motor controller bringup
+│   └── launch_sim.launch.py     # Gazebo simulation
+├── my_robot_bringup/            # Python nodes
+│   ├── motor_controller.py      # L298N motor controller node
+│   └── teleop_keyboard.py       # Keyboard teleoperation node
+├── urdf/                        # Robot description files
+│   ├── robot.urdf.xacro         # Main robot URDF
+│   ├── robot_core.xacro         # Core robot structure
+│   └── lidar.xacro              # LIDAR mount description
+├── worlds/                      # Gazebo world files
+│   ├── empty.world              # Empty simulation world
+│   └── obstacles.world          # World with obstacles
 └── docs/                        # Documentation
-    ├── SETUP.md
-    ├── HARDWARE.md
-    ├── TODO.md
-    └── TROUBLESHOOTING.md
+    ├── SETUP.md                 # Complete setup guide
+    ├── HARDWARE.md              # Bill of materials
+    ├── HARDWARE_REQUIREMENTS.md # Hardware specifications
+    ├── TODO.md                  # Project roadmap
+    ├── TROUBLESHOOTING.md       # Common issues
+    ├── L298N_MOTOR_CONTROL.md   # Motor control guide
+    ├── ENCODER_ODOMETRY_COMPLETE.md  # Odometry setup
+    └── AUDIT_REPORT.md          # Repository audit
 ```
 
 ---
