@@ -8,8 +8,16 @@ motor_controller:
     min_duty_cycle: 80
     max_duty_cycle: 100
     pwm_frequency: 1000
-    speed_kp: 100.0
-    speed_ki: 10.0
-    speed_kd: 0.0
     odom_frame: "odom"
     base_frame: "base_footprint"
+    max_tick_delta: 1200
+    motor_enable_a_pin: 17
+    motor_in1_pin: 27
+    motor_in2_pin: 22
+    motor_enable_b_pin: 13
+    motor_in3_pin: 19
+    motor_in4_pin: 26
+    encoder_left_a_pin: 23
+    encoder_left_b_pin: 24
+    encoder_right_a_pin: 25
+    encoder_right_b_pin: 5

@@ -3,9 +3,9 @@
 <package format="3">
   <name>my_robot_bringup</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="your_email@example.com">ryan</maintainer>
-  <license>TODO: License declaration</license>
+  <description>ROS 2 bringup package for the Hoverbot mobile robot platform.</description>
+  <maintainer email="trickey19@gmail.com">ryan</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -38,6 +38,7 @@
   
   <!-- Hardware drivers -->
   <exec_depend>rplidar_ros</exec_depend>
+  <exec_depend>python3-rpi.gpio</exec_depend>
   
   <!-- Simulation -->
   
@@ -45,8 +46,6 @@
   <!-- Gazebo is only needed on development machines, not robot hardware -->
   <!-- Install manually on dev machine: sudo apt install ros-humble-gazebo-ros-pkgs -->
   
-  <!-- Hardware drivers -->
-  <exec_depend>rplidar_ros</exec_depend>
 
   <!-- Python utilities -->
   <exec_depend>ament_index_python</exec_depend>
@@ -59,9 +58,6 @@
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
  
-  
-  <exec_depend>xacro</exec_depend>
-
   <export>
     <build_type>ament_cmake</build_type>
   </export>
