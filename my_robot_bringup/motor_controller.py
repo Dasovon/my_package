@@ -43,7 +43,8 @@ class MotorController(Node):
         self.declare_parameter('encoder_left_b_pin', 24)
         self.declare_parameter('encoder_right_a_pin', 25)
         self.declare_parameter('encoder_right_b_pin', 5)
-        
+        self.declare_parameter('debug_logging', False)
+
         # Get parameters
         self.wheel_base = self.get_parameter('wheel_base').value
         self.wheel_diameter = self.get_parameter('wheel_diameter').value
@@ -56,7 +57,8 @@ class MotorController(Node):
         self.odom_frame = self.get_parameter('odom_frame').value
         self.base_frame = self.get_parameter('base_frame').value
         self.max_tick_delta = int(self.get_parameter('max_tick_delta').value)
-        
+        self.debug_logging = self.get_parameter('debug_logging').value
+
         # Calculate wheel geometry
         self.wheel_circumference = math.pi * self.wheel_diameter
         self.meters_per_tick = self.wheel_circumference / self.ticks_per_rev
@@ -306,7 +308,27 @@ class MotorController(Node):
         
         odom.twist.twist.linear.x = v_linear
         odom.twist.twist.angular.z = v_angular
-        
+
+        # Set covariance values (6x6 matrix as 36-element array)
+        # Diagonal values represent uncertainty in x, y, z, roll, pitch, yaw
+        # Higher values = more uncertainty
+        odom.pose.covariance = [
+            0.01, 0.0, 0.0, 0.0, 0.0, 0.0,   # x variance
+            0.0, 0.01, 0.0, 0.0, 0.0, 0.0,   # y variance
+            0.0, 0.0, 1e6, 0.0, 0.0, 0.0,    # z variance (high - 2D robot)
+            0.0, 0.0, 0.0, 1e6, 0.0, 0.0,    # roll variance (high - 2D robot)
+            0.0, 0.0, 0.0, 0.0, 1e6, 0.0,    # pitch variance (high - 2D robot)
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.03    # yaw variance
+        ]
+        odom.twist.covariance = [
+            0.01, 0.0, 0.0, 0.0, 0.0, 0.0,   # linear.x variance
+            0.0, 0.01, 0.0, 0.0, 0.0, 0.0,   # linear.y variance
+            0.0, 0.0, 1e6, 0.0, 0.0, 0.0,    # linear.z variance (high - 2D)
+            0.0, 0.0, 0.0, 1e6, 0.0, 0.0,    # angular.x variance (high - 2D)
+            0.0, 0.0, 0.0, 0.0, 1e6, 0.0,    # angular.y variance (high - 2D)
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.03    # angular.z variance
+        ]
+
         self.odom_pub.publish(odom)
     
     def yaw_to_quaternion(self, yaw):
@@ -320,10 +342,10 @@ class MotorController(Node):
     
     def set_motor_a(self, duty):
         """Motor A (left) - INVERTED"""
-        # Debug logging (throttled to 1 Hz)
-        if abs(duty) > 0:
+        # Debug logging (throttled to 1 Hz, configurable)
+        if self.debug_logging and abs(duty) > 0:
             self.get_logger().info(
-                f'Motor A: {duty:.1f}%', 
+                f'Motor A: {duty:.1f}%',
                 throttle_duration_sec=1.0
             )
         
@@ -342,10 +364,10 @@ class MotorController(Node):
     
     def set_motor_b(self, duty):
         """Motor B (right) - INVERTED"""
-        # Debug logging (throttled to 1 Hz)
-        if abs(duty) > 0:
+        # Debug logging (throttled to 1 Hz, configurable)
+        if self.debug_logging and abs(duty) > 0:
             self.get_logger().info(
-                f'Motor B: {duty:.1f}%', 
+                f'Motor B: {duty:.1f}%',
                 throttle_duration_sec=1.0
             )
         

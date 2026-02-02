@@ -21,3 +21,4 @@ motor_controller:
     encoder_left_b_pin: 24
     encoder_right_a_pin: 25
     encoder_right_b_pin: 5
+    debug_logging: false

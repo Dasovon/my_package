@@ -89,42 +89,37 @@ class TeleopKeyboard(Node):
                     self.linear = self.linear_speed
                     self.angular = 0.0
                     print("Forward")
-                    self.publish_cmd_vel()
-                
+
                 # Backward
                 elif key in ['s', 'S', '\x1b[B']:  # S or Down arrow
                     self.linear = -self.linear_speed
                     self.angular = 0.0
                     print("Backward")
-                    self.publish_cmd_vel()
-                
+
                 # Turn left
                 elif key in ['a', 'A', '\x1b[D']:  # A or Left arrow
                     self.linear = 0.0
                     self.angular = self.angular_speed
                     print("Turn Left")
-                    self.publish_cmd_vel()
-                
+
                 # Turn right
                 elif key in ['d', 'D', '\x1b[C']:  # D or Right arrow
                     self.linear = 0.0
                     self.angular = -self.angular_speed
                     print("Turn Right")
-                    self.publish_cmd_vel()
-                
+
                 # Stop
                 elif key == ' ':
                     self.linear = 0.0
                     self.angular = 0.0
                     print("STOP")
-                    self.publish_cmd_vel()
-                
+
                 # Quit
                 elif key in ['q', 'Q', '\x03']:  # Q or Ctrl+C
                     print("\nQuitting...")
                     self.linear = 0.0
                     self.angular = 0.0
-                    self.publish_cmd_vel()  # Send stop command
+                    self.publish_cmd_vel()  # Send final stop command
                     break
                 
                 # Ignore other keys

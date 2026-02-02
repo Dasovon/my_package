@@ -55,14 +55,14 @@
         <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
     </joint>
 
-    <!-- Placeholder wheels (won't move yet, but good for visualization) -->
+    <!-- Wheels -->
     <link name="left_wheel">
         <visual>
             <geometry>
                 <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
             </geometry>
             <material name="black"/>
-            <origin xyz="0 0 0.095" rpy="${pi/2} 0 0"/>
+            <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
         </visual>
 
         <inertial>
@@ -87,7 +87,7 @@
                 <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
             </geometry>
             <material name="black"/>
-            <origin xyz="0 0 0.095" rpy="${pi/2} 0 0"/>
+            <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
         </visual>
 
         <inertial>
@@ -106,16 +106,18 @@
 
     </link>
 
-    <joint name="left_wheel_joint" type="fixed">
+    <joint name="left_wheel_joint" type="continuous">
         <parent link="base_link"/>
         <child link="left_wheel"/>
         <origin xyz="0 ${base_width/2 + wheel_width/2} -${wheel_radius}" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
     </joint>
-    
-    <joint name="right_wheel_joint" type="fixed">
+
+    <joint name="right_wheel_joint" type="continuous">
         <parent link="base_link"/>
         <child link="right_wheel"/>
         <origin xyz="0 -${base_width/2 + wheel_width/2} -${wheel_radius}" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
     </joint>
 
     <!-- Gazebo-specific materials (RViz colors don't work in Gazebo) -->

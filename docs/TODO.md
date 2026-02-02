@@ -1,6 +1,6 @@
 # Project Roadmap and TODO List
 
-**Last Updated:** January 13, 2026
+**Last Updated:** February 2, 2026
 
 ---
 
@@ -85,24 +85,24 @@
 
 ---
 
-## 📋 Phase 4: Motor Control and Odometry
+## ✅ Phase 4: Motor Control and Odometry (COMPLETE)
 
 ### Hoverboard Controller Setup
-- [ ] Research hoverboard UART protocol
-- [ ] Wire controller to Raspberry Pi (UART or USB)
-- [ ] Create motor driver node (subscribe /cmd_vel)
-- [ ] Implement velocity control (linear, angular)
-- [ ] Add current limiting and safety checks
-- [ ] Publish /odom topic from wheel encoders
-- [ ] Configure transforms (odom → base_link)
-- [ ] Test on bench (wheels off ground)
-- [ ] Implement emergency stop mechanism
+- [x] Research hoverboard UART protocol (using L298N H-bridge instead)
+- [x] Wire controller to Raspberry Pi (GPIO pins parameterized)
+- [x] Create motor driver node (subscribe /cmd_vel)
+- [x] Implement velocity control (linear, angular)
+- [x] Add current limiting and safety checks
+- [x] Publish /odom topic from wheel encoders
+- [x] Configure transforms (odom → base_footprint)
+- [x] Test on bench (wheels off ground)
+- [x] Implement emergency stop mechanism (watchdog timeout)
 - [ ] Document motor setup in docs/MOTORS.md
 
 ### Safety Features
-- [ ] Velocity limits (max linear, max angular)
-- [ ] Acceleration limits (prevent wheel slip)
-- [ ] Timeout watchdog (stop if no commands for 1s)
+- [x] Velocity limits (max linear, max angular)
+- [x] PWM ramping (prevents wheel slip)
+- [x] Timeout watchdog (stop if no commands for 1s)
 - [ ] Battery voltage monitoring
 - [ ] Over-current protection
 - [ ] Physical emergency stop button
