@@ -14,6 +14,7 @@ A battery-powered mobile robot that currently runs on a small DC gearmotor chass
 - **Drive System (next):** Hoverboard motor controller (planned)
 - **Sensors:**
   - RPLIDAR A1 (2D lidar) - *Installed, integration next*
+  - RPLIDAR A1 (2D lidar) - *Current*
   - Wheel encoders - *Current*
   - BNO055 IMU - *Planned*
   - Intel RealSense D435i depth camera - *Planned*
@@ -37,7 +38,6 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for complete bill of materials and spec
 - [x] Gazebo simulation setup
 
 ### 🚧 In Progress
-- [ ] RPLIDAR A1 integration
 - [ ] RViz visualization
 - [ ] Hardware testing and calibration
 
