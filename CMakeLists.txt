@@ -23,8 +23,20 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-install(DIRECTORY launch
+# Install directories
+install(DIRECTORY
+  launch
+  config
+  urdf
+  worlds
   DESTINATION share/${PROJECT_NAME}
+)
+
+# Install Python scripts
+install(PROGRAMS
+  my_robot_bringup/motor_controller.py
+  my_robot_bringup/teleop_keyboard.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_package()
