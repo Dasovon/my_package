@@ -131,7 +131,7 @@ class TeleopKeyboard(Node):
                 else:
                     continue
                 
-        except Exception as e:
+        except (OSError, termios.error, ValueError) as e:
             self.get_logger().error(f'Error: {e}')
         finally:
             # Send stop command on exit

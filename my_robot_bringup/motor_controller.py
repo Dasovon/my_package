@@ -7,12 +7,13 @@ Differential Drive Motor Controller with Hall Effect Encoders
 - Odometry publishing (/odom + TF)
 """
 
+import math
+import os
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, TransformStamped, Quaternion
 from nav_msgs.msg import Odometry
 import RPi.GPIO as GPIO
-import math
 from tf2_ros import TransformBroadcaster
 
 
@@ -31,6 +32,17 @@ class MotorController(Node):
         self.declare_parameter('pwm_frequency', 1000)
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'base_footprint')
+        self.declare_parameter('max_tick_delta', 1200)
+        self.declare_parameter('motor_enable_a_pin', 17)
+        self.declare_parameter('motor_in1_pin', 27)
+        self.declare_parameter('motor_in2_pin', 22)
+        self.declare_parameter('motor_enable_b_pin', 13)
+        self.declare_parameter('motor_in3_pin', 19)
+        self.declare_parameter('motor_in4_pin', 26)
+        self.declare_parameter('encoder_left_a_pin', 23)
+        self.declare_parameter('encoder_left_b_pin', 24)
+        self.declare_parameter('encoder_right_a_pin', 25)
+        self.declare_parameter('encoder_right_b_pin', 5)
         
         # Get parameters
         self.wheel_base = self.get_parameter('wheel_base').value
@@ -43,24 +55,25 @@ class MotorController(Node):
         self.pwm_freq = self.get_parameter('pwm_frequency').value
         self.odom_frame = self.get_parameter('odom_frame').value
         self.base_frame = self.get_parameter('base_frame').value
+        self.max_tick_delta = int(self.get_parameter('max_tick_delta').value)
         
         # Calculate wheel geometry
         self.wheel_circumference = math.pi * self.wheel_diameter
         self.meters_per_tick = self.wheel_circumference / self.ticks_per_rev
         
         # Motor control GPIO pins
-        self.ENABLE_A = 17
-        self.IN1 = 27
-        self.IN2 = 22
-        self.ENABLE_B = 13
-        self.IN3 = 19
-        self.IN4 = 26
+        self.ENABLE_A = self.get_parameter('motor_enable_a_pin').value
+        self.IN1 = self.get_parameter('motor_in1_pin').value
+        self.IN2 = self.get_parameter('motor_in2_pin').value
+        self.ENABLE_B = self.get_parameter('motor_enable_b_pin').value
+        self.IN3 = self.get_parameter('motor_in3_pin').value
+        self.IN4 = self.get_parameter('motor_in4_pin').value
         
         # Encoder GPIO pins
-        self.ENC_A_PIN_A = 23
-        self.ENC_A_PIN_B = 24
-        self.ENC_B_PIN_A = 25
-        self.ENC_B_PIN_B = 5
+        self.ENC_A_PIN_A = self.get_parameter('encoder_left_a_pin').value
+        self.ENC_A_PIN_B = self.get_parameter('encoder_left_b_pin').value
+        self.ENC_B_PIN_A = self.get_parameter('encoder_right_a_pin').value
+        self.ENC_B_PIN_B = self.get_parameter('encoder_right_b_pin').value
         
         # Encoder state
         self.ticks_left = 0
@@ -111,8 +124,8 @@ class MotorController(Node):
     
     def setup_gpio(self):
         """Initialize GPIO"""
+        self.validate_gpio_access()
         GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
         
         # Motor pins
         GPIO.setup(self.ENABLE_A, GPIO.OUT)
@@ -188,6 +201,9 @@ class MotorController(Node):
         delta_left = self.ticks_left - self.last_ticks_left
         delta_right = self.ticks_right - self.last_ticks_right
         
+        delta_left = self.clamp_tick_delta(delta_left, 'left')
+        delta_right = self.clamp_tick_delta(delta_right, 'right')
+
         self.measured_vel_left = (delta_left * self.meters_per_tick) / dt
         self.measured_vel_right = (delta_right * self.meters_per_tick) / dt
         
@@ -371,6 +387,30 @@ class MotorController(Node):
         self.pwm_b.stop()
         GPIO.cleanup()
         self.get_logger().info('GPIO cleanup complete')
+
+    def validate_gpio_access(self):
+        """Ensure GPIO device access is available before setup."""
+        gpio_paths = ("/dev/gpiomem", "/dev/mem")
+        has_access = any(os.access(path, os.R_OK | os.W_OK) for path in gpio_paths)
+        if not has_access:
+            msg = (
+                "GPIO access not available. Ensure you are running on a Raspberry Pi "
+                "with permission to access /dev/gpiomem or /dev/mem."
+            )
+            self.get_logger().error(msg)
+            raise RuntimeError(msg)
+
+    def clamp_tick_delta(self, delta, label):
+        """Sanity check encoder ticks to avoid extreme spikes."""
+        if abs(delta) > self.max_tick_delta:
+            clamped = self.max_tick_delta if delta > 0 else -self.max_tick_delta
+            self.get_logger().warn(
+                f'Encoder delta for {label} wheel out of range ({delta}); '
+                f'clamping to {clamped}.',
+                throttle_duration_sec=1.0
+            )
+            return clamped
+        return delta
 
 
 def main(args=None):
