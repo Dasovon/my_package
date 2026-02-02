@@ -2,11 +2,11 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
     <!-- Define some properties (easy to change later) -->
-    <xacro:property name="base_width" value="0.450"/>
+    <xacro:property name="base_width" value="0.165"/>
     <xacro:property name="base_length" value="0.179"/>
     <xacro:property name="base_height" value="0.022"/>
     
-    <xacro:property name="wheel_radius" value="0.084"/>
+    <xacro:property name="wheel_radius" value="0.032375"/>
     <xacro:property name="wheel_width" value="0.058"/>
 
     <!-- Materials for visualization -->
