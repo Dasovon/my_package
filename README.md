@@ -2,7 +2,7 @@
 
 **Status:** Base ROS 2 system configured ✅ | Motor control implemented ✅ | Sensor integration in progress 🚧
 
-A battery-powered mobile robot built on a hoverboard drive base with RPLIDAR, BNO055 IMU, and Intel RealSense depth camera. Running ROS 2 Humble on Ubuntu 22.04.
+A battery-powered mobile robot that currently runs on a small DC gearmotor chassis with L298N control and RPLIDAR + wheel encoders, before moving to a hoverboard drive base. Running ROS 2 Humble on Ubuntu 22.04.
 
 ---
 
@@ -10,9 +10,11 @@ A battery-powered mobile robot built on a hoverboard drive base with RPLIDAR, BN
 
 - **Robot Computer:** Raspberry Pi 4/5 (hostname: `hoverbot`)
 - **Development PC:** Ubuntu 22.04 desktop (hostname: `dev`)
-- **Drive System:** Hoverboard motor controller (planned)
+- **Drive System (current):** Small DC gearmotor chassis + L298N
+- **Drive System (next):** Hoverboard motor controller (planned)
 - **Sensors:**
-  - RPLIDAR A1 (2D lidar) - *Integration in progress*
+  - RPLIDAR A1 (2D lidar) - *Current*
+  - Wheel encoders - *Current*
   - BNO055 IMU - *Planned*
   - Intel RealSense D435i depth camera - *Planned*
 
@@ -35,7 +37,6 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for complete bill of materials and spec
 - [x] Gazebo simulation setup
 
 ### 🚧 In Progress
-- [ ] RPLIDAR A1 integration
 - [ ] RViz visualization
 - [ ] Hardware testing and calibration
 
@@ -149,7 +150,7 @@ my_robot_bringup/
 
 ## Network Configuration
 
-- **Development PC:** `dev` (192.168.86.37)
+- **Development PC:** `dev` (set per network)
 - **Robot Computer:** `hoverbot` (192.168.86.33)
 - **ROS Domain ID:** 42
 - **Connection:** Passwordless SSH configured

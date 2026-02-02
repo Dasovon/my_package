@@ -1,6 +1,7 @@
 # Hardware Bill of Materials
 
 Complete hardware specifications and bill of materials for the Hoverbot mobile robot.
+Current development runs on a small DC gearmotor chassis with L298N motor control before the hoverboard drive upgrade.
 
 ---
 
@@ -14,7 +15,7 @@ Complete hardware specifications and bill of materials for the Hoverbot mobile r
 - **Storage:** 50GB+ free space
 - **Network:** WiFi or Ethernet
 - **Hostname:** dev
-- **IP Address:** 192.168.86.37
+- **IP Address:** (set per network)
 
 ### Robot Computer ("hoverbot")
 - **Model:** Raspberry Pi 4 or 5
@@ -32,7 +33,7 @@ Complete hardware specifications and bill of materials for the Hoverbot mobile r
 ## Sensors
 
 ### RPLIDAR A1 - 2D Laser Scanner
-- **Status:** Hardware available, integration in progress
+- **Status:** Installed and in use
 - **Type:** 360° 2D laser range scanner
 - **Range:** 0.15m - 12m
 - **Sample Rate:** 8000 samples/second
@@ -68,7 +69,14 @@ Complete hardware specifications and bill of materials for the Hoverbot mobile r
 
 ## Actuators
 
-### Hoverboard Motor Controller
+### Small DC Gearmotor Chassis (Current)
+- **Status:** In use
+- **Motor Type:** DG01D-E with encoders
+- **Motor Driver:** L298N dual H-bridge
+- **Wheel Diameter:** 65mm
+- **Wheelbase:** 165mm
+
+### Hoverboard Motor Controller (Next Platform)
 - **Status:** Planned, not yet integrated
 - **Type:** Dual brushless DC motor controller (from hoverboard)
 - **Interface:** UART (bidirectional control)
