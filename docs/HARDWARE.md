@@ -33,8 +33,7 @@ Current development runs on a small DC gearmotor chassis with L298N motor contro
 ## Sensors
 
 ### RPLIDAR A1 - 2D Laser Scanner
-- **Status:** Installed, integration next
-- **Status:** Installed and in use
+- **Status:** Integrated and in use
 - **Type:** 360° 2D laser range scanner
 - **Range:** 0.15m - 12m
 - **Sample Rate:** 8000 samples/second
