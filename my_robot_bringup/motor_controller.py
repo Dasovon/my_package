@@ -43,7 +43,8 @@ class MotorController(Node):
         self.declare_parameter('encoder_left_b_pin', 24)
         self.declare_parameter('encoder_right_a_pin', 25)
         self.declare_parameter('encoder_right_b_pin', 5)
-        
+        self.declare_parameter('enable_debug_logging', False)
+
         # Get parameters
         self.wheel_base = self.get_parameter('wheel_base').value
         self.wheel_diameter = self.get_parameter('wheel_diameter').value
@@ -56,7 +57,8 @@ class MotorController(Node):
         self.odom_frame = self.get_parameter('odom_frame').value
         self.base_frame = self.get_parameter('base_frame').value
         self.max_tick_delta = int(self.get_parameter('max_tick_delta').value)
-        
+        self.debug_logging = self.get_parameter('enable_debug_logging').value
+
         # Calculate wheel geometry
         self.wheel_circumference = math.pi * self.wheel_diameter
         self.meters_per_tick = self.wheel_circumference / self.ticks_per_rev
@@ -154,29 +156,30 @@ class MotorController(Node):
         self.prev_enc_a_state = GPIO.input(self.ENC_A_PIN_A)
         self.prev_enc_b_state = GPIO.input(self.ENC_B_PIN_A)
     
+    def _read_single_encoder(self, pin_a, pin_b, ticks, prev_state):
+        """Read a single quadrature encoder and return (ticks, prev_state)."""
+        curr_a = GPIO.input(pin_a)
+        curr_b = GPIO.input(pin_b)
+
+        if curr_a != prev_state:
+            if curr_a == curr_b:
+                ticks += 1
+            else:
+                ticks -= 1
+            prev_state = curr_a
+
+        return ticks, prev_state
+
     def read_encoders(self):
         """Quadrature encoder reading"""
-        # Motor A (left)
-        curr_a_a = GPIO.input(self.ENC_A_PIN_A)
-        curr_a_b = GPIO.input(self.ENC_A_PIN_B)
-        
-        if curr_a_a != self.prev_enc_a_state:
-            if curr_a_a == curr_a_b:
-                self.ticks_left += 1
-            else:
-                self.ticks_left -= 1
-            self.prev_enc_a_state = curr_a_a
-        
-        # Motor B (right)
-        curr_b_a = GPIO.input(self.ENC_B_PIN_A)
-        curr_b_b = GPIO.input(self.ENC_B_PIN_B)
-        
-        if curr_b_a != self.prev_enc_b_state:
-            if curr_b_a == curr_b_b:
-                self.ticks_right += 1
-            else:
-                self.ticks_right -= 1
-            self.prev_enc_b_state = curr_b_a
+        self.ticks_left, self.prev_enc_a_state = self._read_single_encoder(
+            self.ENC_A_PIN_A, self.ENC_A_PIN_B,
+            self.ticks_left, self.prev_enc_a_state
+        )
+        self.ticks_right, self.prev_enc_b_state = self._read_single_encoder(
+            self.ENC_B_PIN_A, self.ENC_B_PIN_B,
+            self.ticks_right, self.prev_enc_b_state
+        )
     
     def cmd_vel_callback(self, msg):
         """Convert Twist to wheel velocities"""
@@ -306,7 +309,26 @@ class MotorController(Node):
         
         odom.twist.twist.linear.x = v_linear
         odom.twist.twist.angular.z = v_angular
-        
+
+        # Covariance values for downstream nodes (SLAM, Nav2)
+        # 6x6 covariance matrix flattened (x, y, z, roll, pitch, yaw)
+        odom.pose.covariance = [
+            0.01, 0.0, 0.0, 0.0, 0.0, 0.0,   # x variance
+            0.0, 0.01, 0.0, 0.0, 0.0, 0.0,   # y variance
+            0.0, 0.0, 0.01, 0.0, 0.0, 0.0,   # z variance
+            0.0, 0.0, 0.0, 0.01, 0.0, 0.0,   # roll variance
+            0.0, 0.0, 0.0, 0.0, 0.01, 0.0,   # pitch variance
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.01    # yaw variance
+        ]
+        odom.twist.covariance = [
+            0.01, 0.0, 0.0, 0.0, 0.0, 0.0,   # linear x
+            0.0, 0.01, 0.0, 0.0, 0.0, 0.0,   # linear y
+            0.0, 0.0, 0.01, 0.0, 0.0, 0.0,   # linear z
+            0.0, 0.0, 0.0, 0.01, 0.0, 0.0,   # angular roll
+            0.0, 0.0, 0.0, 0.0, 0.01, 0.0,   # angular pitch
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.01    # angular yaw
+        ]
+
         self.odom_pub.publish(odom)
     
     def yaw_to_quaternion(self, yaw):
@@ -320,10 +342,10 @@ class MotorController(Node):
     
     def set_motor_a(self, duty):
         """Motor A (left) - INVERTED"""
-        # Debug logging (throttled to 1 Hz)
-        if abs(duty) > 0:
+        # Debug logging (throttled to 1 Hz, configurable)
+        if self.debug_logging and abs(duty) > 0:
             self.get_logger().info(
-                f'Motor A: {duty:.1f}%', 
+                f'Motor A: {duty:.1f}%',
                 throttle_duration_sec=1.0
             )
         
@@ -342,10 +364,10 @@ class MotorController(Node):
     
     def set_motor_b(self, duty):
         """Motor B (right) - INVERTED"""
-        # Debug logging (throttled to 1 Hz)
-        if abs(duty) > 0:
+        # Debug logging (throttled to 1 Hz, configurable)
+        if self.debug_logging and abs(duty) > 0:
             self.get_logger().info(
-                f'Motor B: {duty:.1f}%', 
+                f'Motor B: {duty:.1f}%',
                 throttle_duration_sec=1.0
             )
         

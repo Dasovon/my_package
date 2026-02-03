@@ -13,7 +13,11 @@ find_package(ament_cmake REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
+  find_package(ament_cmake_pytest REQUIRED)
   ament_lint_auto_find_test_dependencies()
+
+  # Add pytest tests
+  ament_add_pytest_test(test_motor_controller test/test_motor_controller.py)
 endif()
 
 # Install launch and config directories
