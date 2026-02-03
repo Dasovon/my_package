@@ -5,7 +5,7 @@ motor_controller:
     encoder_ticks_per_rev: 576
     max_speed: 0.5
     max_angular_speed: 2.0
-    min_duty_cycle: 80
+    min_duty_cycle: 95
     max_duty_cycle: 100
     pwm_frequency: 1000
     odom_frame: "odom"
