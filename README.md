@@ -116,16 +116,17 @@ my_robot_bringup/
 ├── LICENSE                      # MIT License
 ├── config/                      # Parameter files
 │   ├── motor_controller.yaml    # Motor controller parameters
-│   ├── my_controllers.yaml      # General controller config
 │   └── rplidar.yaml             # RPLIDAR configuration
 ├── launch/                      # Launch files
-│   ├── talker.launch.py         # Demo publisher node
-│   ├── listener.launch.py       # Demo subscriber node
-│   ├── service_example.launch.py
+│   ├── full_bringup.launch.py   # Full robot bringup (RSP + motors + lidar)
+│   ├── motor_control.launch.py  # Motor controller bringup
 │   ├── rplidar.launch.py        # RPLIDAR bringup
 │   ├── rsp.launch.py            # Robot state publisher
-│   ├── motor_control.launch.py  # Motor controller bringup
-│   └── launch_sim.launch.py     # Gazebo simulation
+│   ├── teleop_keyboard.launch.py # Keyboard teleoperation
+│   ├── launch_sim.launch.py     # Gazebo simulation
+│   ├── talker.launch.py         # Demo publisher node
+│   ├── listener.launch.py       # Demo subscriber node
+│   └── service_example.launch.py # Demo service node
 ├── my_robot_bringup/            # Python nodes
 │   ├── motor_controller.py      # L298N motor controller node
 │   └── teleop_keyboard.py       # Keyboard teleoperation node

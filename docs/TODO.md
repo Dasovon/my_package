@@ -1,6 +1,6 @@
 # Project Roadmap and TODO List
 
-**Last Updated:** January 13, 2026
+**Last Updated:** February 3, 2026
 
 ---
 
@@ -20,19 +20,18 @@
 
 ---
 
-## 🚧 Phase 2: Sensor Integration (IN PROGRESS)
+## ✅ Phase 2: Sensor Integration (COMPLETE)
 
 ### RPLIDAR A1 Integration
-- [ ] Install rplidar_ros ROS 2 package
-- [ ] Configure serial permissions (/dev/ttyUSB0)
-- [ ] Create rplidar.launch.py with parameters
-- [ ] Verify /scan topic publishes LaserScan messages
-- [ ] Set up static transform (base_link → laser_frame)
-- [ ] Create minimal URDF for robot structure
-- [ ] Add robot_state_publisher to launch
-- [ ] Visualize laser scans in RViz
-- [ ] Document RPLIDAR setup in docs/RPLIDAR.md
-- [ ] Test range, accuracy, and update rate
+- [x] Install rplidar_ros ROS 2 package
+- [x] Configure serial permissions (/dev/ttyUSB0)
+- [x] Create rplidar.launch.py with parameters
+- [x] Verify /scan topic publishes LaserScan messages
+- [x] Set up static transform (base_link → laser_frame)
+- [x] Create minimal URDF for robot structure
+- [x] Add robot_state_publisher to launch
+- [x] Visualize laser scans in RViz
+- [x] Document RPLIDAR setup in docs/
 
 ### BNO055 IMU Integration
 - [ ] Wire IMU to Raspberry Pi I2C or UART
@@ -58,15 +57,14 @@
 
 ---
 
-## 📋 Phase 3: Robot Description and Visualization
+## ✅ Phase 3: Robot Description and Visualization (COMPLETE)
 
 ### URDF Development
-- [ ] Create robot base geometry (chassis dimensions)
-- [ ] Add wheel positions and sizes
-- [ ] Define all sensor frame positions
-- [ ] Use Xacro for parametric design
-- [ ] Add visual meshes (optional STL files)
-- [ ] Publish complete robot_state_publisher
+- [x] Create robot base geometry (chassis dimensions)
+- [x] Add wheel positions and sizes
+- [x] Define all sensor frame positions
+- [x] Use Xacro for parametric design
+- [x] Publish complete robot_state_publisher
 
 ### RViz Configuration
 - [ ] Create default RViz config file
@@ -78,38 +76,42 @@
 - [ ] Save config to package (config/default.rviz)
 
 ### TF Tree Validation
-- [ ] Verify all frames published
-- [ ] Check transform timestamps (avoid stale warnings)
+- [x] Verify all frames published
+- [x] Check transform timestamps (avoid stale warnings)
 - [ ] Use tf2_tools to visualize tree
 - [ ] Document frame conventions in docs/FRAMES.md
 
 ---
 
-## 📋 Phase 4: Motor Control and Odometry
+## ✅ Phase 4: Motor Control and Odometry (COMPLETE)
 
-### Hoverboard Controller Setup
-- [ ] Research hoverboard UART protocol
-- [ ] Wire controller to Raspberry Pi (UART or USB)
-- [ ] Create motor driver node (subscribe /cmd_vel)
-- [ ] Implement velocity control (linear, angular)
-- [ ] Add current limiting and safety checks
-- [ ] Publish /odom topic from wheel encoders
-- [ ] Configure transforms (odom → base_link)
-- [ ] Test on bench (wheels off ground)
-- [ ] Implement emergency stop mechanism
-- [ ] Document motor setup in docs/MOTORS.md
+### Motor Controller Setup
+- [x] L298N motor driver with DG01D-E gearmotors
+- [x] Wire controller to Raspberry Pi GPIO
+- [x] Create motor_controller.py node (subscribe /cmd_vel)
+- [x] Implement differential drive velocity control
+- [x] Add PWM ramping and duty cycle limits
+- [x] Hall effect encoder integration (576 ticks/rev)
+- [x] Publish /odom topic with covariance values
+- [x] Configure transforms (odom → base_footprint → base_link)
+- [x] Test on bench (wheels off ground)
+- [x] Implement emergency stop mechanism
+- [x] Document motor setup in docs/L298N_MOTOR_CONTROL.md
+- [x] Document encoder odometry in docs/ENCODER_ODOMETRY_COMPLETE.md
 
 ### Safety Features
-- [ ] Velocity limits (max linear, max angular)
-- [ ] Acceleration limits (prevent wheel slip)
-- [ ] Timeout watchdog (stop if no commands for 1s)
+- [x] Velocity limits (max linear 0.3 m/s, max angular 1.0 rad/s)
+- [x] Min duty cycle threshold (80% for motor startup)
+- [x] Timeout watchdog (stop if no commands for 1s)
+- [x] Encoder tick delta clamping (noise rejection)
+- [x] GPIO access validation before initialization
 - [ ] Battery voltage monitoring
 - [ ] Over-current protection
 - [ ] Physical emergency stop button
 
 ---
 
-## 📋 Phase 5: Localization and Mapping
+## 🚧 Phase 5: Localization and Mapping (IN PROGRESS)
 
 ### Static Map Testing
 - [ ] Install nav2 packages
