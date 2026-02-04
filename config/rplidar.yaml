@@ -5,4 +5,3 @@
     frame_id: laser_frame
     inverted: false
     angle_compensate: true
-    scan_mode: Standard
