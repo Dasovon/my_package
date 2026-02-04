@@ -13,6 +13,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, TransformStamped, Quaternion
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import JointState
 import RPi.GPIO as GPIO
 from tf2_ros import TransformBroadcaster
 
@@ -112,6 +113,7 @@ class MotorController(Node):
             Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         
         self.odom_pub = self.create_publisher(Odometry, 'odom', 10)
+        self.joint_state_pub = self.create_publisher(JointState, 'joint_states', 10)
         self.tf_broadcaster = TransformBroadcaster(self)
         
         # Timers
@@ -278,6 +280,7 @@ class MotorController(Node):
         
         # Publish
         self.publish_odometry(v_linear, v_angular)
+        self.publish_joint_states()
     
     def publish_odometry(self, v_linear, v_angular):
         """Publish odometry and TF"""
@@ -330,7 +333,30 @@ class MotorController(Node):
         ]
 
         self.odom_pub.publish(odom)
-    
+
+    def publish_joint_states(self):
+        """Publish wheel joint states from encoder ticks."""
+        current_time = self.get_clock().now()
+
+        # Convert encoder ticks to radians
+        # radians = (ticks / ticks_per_rev) * 2 * pi
+        radians_per_tick = (2.0 * math.pi) / self.ticks_per_rev
+        left_wheel_pos = self.ticks_left * radians_per_tick
+        right_wheel_pos = self.ticks_right * radians_per_tick
+
+        # Calculate wheel velocities in rad/s
+        left_wheel_vel = self.measured_vel_left / (self.wheel_diameter / 2.0)
+        right_wheel_vel = self.measured_vel_right / (self.wheel_diameter / 2.0)
+
+        js = JointState()
+        js.header.stamp = current_time.to_msg()
+        js.name = ['left_wheel_joint', 'right_wheel_joint']
+        js.position = [left_wheel_pos, right_wheel_pos]
+        js.velocity = [left_wheel_vel, right_wheel_vel]
+        js.effort = []
+
+        self.joint_state_pub.publish(js)
+
     def yaw_to_quaternion(self, yaw):
         """Convert yaw to quaternion"""
         quat = Quaternion()
