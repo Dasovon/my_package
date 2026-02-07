@@ -26,7 +26,7 @@ class MotorController(Node):
         # Declare parameters
         self.declare_parameter('wheel_base', 0.165)
         self.declare_parameter('wheel_diameter', 0.06475)
-        self.declare_parameter('encoder_ticks_per_rev', 576)
+        self.declare_parameter('encoder_ticks_per_rev', 288)  # 3 pulses * 2 edges * 48:1 gear
         self.declare_parameter('max_speed', 0.5)
         self.declare_parameter('max_angular_speed', 2.0)
         self.declare_parameter('min_duty_cycle', 80)  # Increased from 60
@@ -125,11 +125,11 @@ class MotorController(Node):
         
         # Timers
         self.control_timer = self.create_timer(0.02, self.control_loop)  # 50 Hz
-        self.encoder_timer = self.create_timer(0.01, self.read_encoders)  # 100 Hz
+        self.encoder_timer = self.create_timer(0.002, self.read_encoders)  # 500 Hz for better tick capture
         self.watchdog_timer = self.create_timer(0.1, self.watchdog_check)
         
         self.get_logger().info('Motor controller initialized')
-        self.get_logger().info(f'DG01D-E: 1:48 ratio, 576 ticks/rev')
+        self.get_logger().info(f'DG01D-E: 1:48 ratio, {self.ticks_per_rev} ticks/rev')
         self.get_logger().info(f'Wheel base: {self.wheel_base:.3f} m')
         self.get_logger().info(f'Min duty: {self.min_duty}%')
     
