@@ -181,8 +181,9 @@ class MotorController(Node):
 
     def read_encoders(self):
         """Quadrature encoder reading"""
+        # Swap A/B pins for left encoder to invert direction (motor mounted mirrored)
         self.ticks_left, self.prev_enc_a_state = self._read_single_encoder(
-            self.ENC_A_PIN_A, self.ENC_A_PIN_B,
+            self.ENC_A_PIN_B, self.ENC_A_PIN_A,
             self.ticks_left, self.prev_enc_a_state
         )
         self.ticks_right, self.prev_enc_b_state = self._read_single_encoder(
