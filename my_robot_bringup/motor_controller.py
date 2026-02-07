@@ -11,6 +11,7 @@ import math
 import os
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from geometry_msgs.msg import Twist, TransformStamped, Quaternion
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
@@ -113,7 +114,13 @@ class MotorController(Node):
             Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         
         self.odom_pub = self.create_publisher(Odometry, 'odom', 10)
-        self.joint_state_pub = self.create_publisher(JointState, 'joint_states', 10)
+        # Use BEST_EFFORT QoS to match robot_state_publisher's subscription
+        joint_state_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+        self.joint_state_pub = self.create_publisher(JointState, 'joint_states', joint_state_qos)
         self.tf_broadcaster = TransformBroadcaster(self)
         
         # Timers
