@@ -64,6 +64,8 @@ source install/setup.bash
 
 Tip: paste the command **once**. If you accidentally paste it twice (e.g., `--symlink-installcolcon build`), `colcon` will report unrecognized arguments.
 
+If you see warnings about missing paths in `COLCON_PREFIX_PATH`/`AMENT_PREFIX_PATH`/`CMAKE_PREFIX_PATH` right after a clean build, they usually mean your shell still has older values from a different workspace. Re-source this workspace after the build (`source ~/robot_ws/install/setup.bash`) or open a fresh terminal and try again.
+
 If dependencies are missing:
 
 ```bash
@@ -77,6 +79,8 @@ my_robot_bringup: Cannot locate rosdep definition for [python3-rpi.gpio]
 ```
 
 This is expected on the Pi. It uses the OS package (`python3-rpi.gpio`) and is already satisfied, so you can ignore the warning and continue.
+
+Note: that error line is output from `rosdep`. Don’t paste it back into the shell—`my_robot_bringup: Cannot locate rosdep...` is not a command.
 
 Then rebuild.
 
