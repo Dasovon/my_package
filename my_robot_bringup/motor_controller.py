@@ -45,6 +45,9 @@ class MotorController(Node):
         self.declare_parameter('encoder_left_b_pin', 24)
         self.declare_parameter('encoder_right_a_pin', 25)
         self.declare_parameter('encoder_right_b_pin', 5)
+        self.declare_parameter('encoder_left_inverted', True)
+        self.declare_parameter('encoder_right_inverted', False)
+        self.declare_parameter('encoder_bouncetime_ms', 1)
         self.declare_parameter('enable_debug_logging', False)
 
         # Get parameters
@@ -60,6 +63,9 @@ class MotorController(Node):
         self.base_frame = self.get_parameter('base_frame').value
         self.max_tick_delta = int(self.get_parameter('max_tick_delta').value)
         self.debug_logging = self.get_parameter('enable_debug_logging').value
+        self.left_encoder_inverted = self.get_parameter('encoder_left_inverted').value
+        self.right_encoder_inverted = self.get_parameter('encoder_right_inverted').value
+        self.encoder_bouncetime_ms = int(self.get_parameter('encoder_bouncetime_ms').value)
 
         # Calculate wheel geometry
         self.wheel_circumference = math.pi * self.wheel_diameter
@@ -84,8 +90,8 @@ class MotorController(Node):
         self.ticks_right = 0
         self.last_ticks_left = 0
         self.last_ticks_right = 0
-        self.prev_enc_a_state = 0
-        self.prev_enc_b_state = 0
+        self.encoder_state_left = 0
+        self.encoder_state_right = 0
         
         # Velocity tracking
         self.measured_vel_left = 0.0
@@ -125,7 +131,6 @@ class MotorController(Node):
         
         # Timers
         self.control_timer = self.create_timer(0.02, self.control_loop)  # 50 Hz
-        self.encoder_timer = self.create_timer(0.002, self.read_encoders)  # 500 Hz for better tick capture
         self.watchdog_timer = self.create_timer(0.1, self.watchdog_check)
         
         self.get_logger().info('Motor controller initialized')
@@ -161,35 +166,79 @@ class MotorController(Node):
         GPIO.setup(self.ENC_A_PIN_B, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.ENC_B_PIN_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.ENC_B_PIN_B, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        
-        self.prev_enc_a_state = GPIO.input(self.ENC_A_PIN_A)
-        self.prev_enc_b_state = GPIO.input(self.ENC_B_PIN_A)
-    
-    def _read_single_encoder(self, pin_a, pin_b, ticks, prev_state):
-        """Read a single quadrature encoder and return (ticks, prev_state)."""
-        curr_a = GPIO.input(pin_a)
-        curr_b = GPIO.input(pin_b)
 
-        if curr_a != prev_state:
-            if curr_a == curr_b:
-                ticks += 1
+        self.encoder_state_left = self._read_encoder_state(self.ENC_A_PIN_A, self.ENC_A_PIN_B)
+        self.encoder_state_right = self._read_encoder_state(self.ENC_B_PIN_A, self.ENC_B_PIN_B)
+
+        self._setup_encoder_events()
+
+    def _read_encoder_state(self, pin_a, pin_b):
+        return (GPIO.input(pin_a) << 1) | GPIO.input(pin_b)
+
+    def _setup_encoder_events(self):
+        """Configure GPIO edge callbacks for encoders."""
+        self._add_encoder_event(self.ENC_A_PIN_A, self._left_encoder_callback)
+        self._add_encoder_event(self.ENC_A_PIN_B, self._left_encoder_callback)
+        self._add_encoder_event(self.ENC_B_PIN_A, self._right_encoder_callback)
+        self._add_encoder_event(self.ENC_B_PIN_B, self._right_encoder_callback)
+
+    def _add_encoder_event(self, pin, callback):
+        bouncetime = self.encoder_bouncetime_ms if self.encoder_bouncetime_ms > 0 else None
+        try:
+            if bouncetime is None:
+                GPIO.add_event_detect(pin, GPIO.BOTH, callback=callback)
             else:
-                ticks -= 1
-            prev_state = curr_a
+                GPIO.add_event_detect(pin, GPIO.BOTH, callback=callback, bouncetime=bouncetime)
+        except RuntimeError as exc:
+            self.get_logger().error(
+                f'Failed to add GPIO event detect for pin {pin}: {exc}'
+            )
+            raise
 
-        return ticks, prev_state
+    def _quadrature_delta(self, last_state, new_state):
+        """Compute delta ticks from quadrature state transition."""
+        transition = (last_state << 2) | new_state
+        lookup = {
+            0b0001: 1,
+            0b0010: -1,
+            0b0100: -1,
+            0b0111: 1,
+            0b1000: 1,
+            0b1011: -1,
+            0b1101: -1,
+            0b1110: 1,
+        }
+        return lookup.get(transition, 0)
 
-    def read_encoders(self):
-        """Quadrature encoder reading"""
-        # Swap A/B pins for left encoder to invert direction (motor mounted mirrored)
-        self.ticks_left, self.prev_enc_a_state = self._read_single_encoder(
-            self.ENC_A_PIN_B, self.ENC_A_PIN_A,
-            self.ticks_left, self.prev_enc_a_state
-        )
-        self.ticks_right, self.prev_enc_b_state = self._read_single_encoder(
-            self.ENC_B_PIN_A, self.ENC_B_PIN_B,
-            self.ticks_right, self.prev_enc_b_state
-        )
+    def _left_encoder_callback(self, channel):
+        self._update_encoder('left')
+
+    def _right_encoder_callback(self, channel):
+        self._update_encoder('right')
+
+    def _update_encoder(self, side):
+        if side == 'left':
+            pin_a = self.ENC_A_PIN_A
+            pin_b = self.ENC_A_PIN_B
+            last_state = self.encoder_state_left
+            inverted = self.left_encoder_inverted
+        else:
+            pin_a = self.ENC_B_PIN_A
+            pin_b = self.ENC_B_PIN_B
+            last_state = self.encoder_state_right
+            inverted = self.right_encoder_inverted
+
+        new_state = self._read_encoder_state(pin_a, pin_b)
+        delta = self._quadrature_delta(last_state, new_state)
+        if inverted:
+            delta = -delta
+
+        if side == 'left':
+            self.ticks_left += delta
+            self.encoder_state_left = new_state
+        else:
+            self.ticks_right += delta
+            self.encoder_state_right = new_state
     
     def cmd_vel_callback(self, msg):
         """Convert Twist to wheel velocities"""
@@ -267,10 +316,9 @@ class MotorController(Node):
         return duty if velocity >= 0 else -duty
     
     def update_odometry(self, dt):
-        """Calculate odometry from commanded velocities (more stable than encoder-based)"""
-        # Use commanded velocities for odometry (encoder direction detection is unreliable)
-        v_left = self.target_vel_left
-        v_right = self.target_vel_right
+        """Calculate odometry from encoder-measured velocities."""
+        v_left = self.measured_vel_left
+        v_right = self.measured_vel_right
 
         v_linear = (v_left + v_right) / 2.0
         v_angular = (v_right - v_left) / self.wheel_base
