@@ -79,13 +79,11 @@ class MotorController(Node):
         self.ENC_B_PIN_A = self.get_parameter('encoder_right_a_pin').value
         self.ENC_B_PIN_B = self.get_parameter('encoder_right_b_pin').value
         
-        # Encoder state
+        # Encoder state (updated by interrupt callbacks)
         self.ticks_left = 0
         self.ticks_right = 0
         self.last_ticks_left = 0
         self.last_ticks_right = 0
-        self.prev_enc_a_state = 0
-        self.prev_enc_b_state = 0
         
         # Velocity tracking
         self.measured_vel_left = 0.0
@@ -123,9 +121,8 @@ class MotorController(Node):
         self.joint_state_pub = self.create_publisher(JointState, 'joint_states', joint_state_qos)
         self.tf_broadcaster = TransformBroadcaster(self)
         
-        # Timers
+        # Timers (encoder reading is now interrupt-driven, no polling timer needed)
         self.control_timer = self.create_timer(0.02, self.control_loop)  # 50 Hz
-        self.encoder_timer = self.create_timer(0.002, self.read_encoders)  # 500 Hz for better tick capture
         self.watchdog_timer = self.create_timer(0.1, self.watchdog_check)
         
         self.get_logger().info('Motor controller initialized')
@@ -156,40 +153,49 @@ class MotorController(Node):
         self.pwm_a.start(0)
         self.pwm_b.start(0)
         
-        # Encoder pins
+        # Encoder pins with interrupt-based quadrature decoding
         GPIO.setup(self.ENC_A_PIN_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.ENC_A_PIN_B, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.ENC_B_PIN_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.ENC_B_PIN_B, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        
-        self.prev_enc_a_state = GPIO.input(self.ENC_A_PIN_A)
-        self.prev_enc_b_state = GPIO.input(self.ENC_B_PIN_A)
+
+        # Register edge-detect interrupts on both channels of both encoders
+        # bouncetime=1ms filters contact noise without losing real transitions
+        GPIO.add_event_detect(
+            self.ENC_A_PIN_A, GPIO.BOTH,
+            callback=self._left_encoder_callback, bouncetime=1)
+        GPIO.add_event_detect(
+            self.ENC_A_PIN_B, GPIO.BOTH,
+            callback=self._left_encoder_callback, bouncetime=1)
+        GPIO.add_event_detect(
+            self.ENC_B_PIN_A, GPIO.BOTH,
+            callback=self._right_encoder_callback, bouncetime=1)
+        GPIO.add_event_detect(
+            self.ENC_B_PIN_B, GPIO.BOTH,
+            callback=self._right_encoder_callback, bouncetime=1)
     
-    def _read_single_encoder(self, pin_a, pin_b, ticks, prev_state):
-        """Read a single quadrature encoder and return (ticks, prev_state)."""
-        curr_a = GPIO.input(pin_a)
-        curr_b = GPIO.input(pin_b)
+    def _left_encoder_callback(self, channel):
+        """Interrupt callback for left encoder (both channels, both edges).
 
-        if curr_a != prev_state:
-            if curr_a == curr_b:
-                ticks += 1
-            else:
-                ticks -= 1
-            prev_state = curr_a
+        Standard quadrature decoding with inverted sign because the left
+        motor is mounted mirrored.
+        """
+        a = GPIO.input(self.ENC_A_PIN_A)
+        b = GPIO.input(self.ENC_A_PIN_B)
+        # Inverted sign (swap +1/-1) to account for mirrored left motor mount
+        if channel == self.ENC_A_PIN_A:
+            self.ticks_left += -1 if a != b else 1
+        else:
+            self.ticks_left += -1 if a == b else 1
 
-        return ticks, prev_state
-
-    def read_encoders(self):
-        """Quadrature encoder reading"""
-        # Swap A/B pins for left encoder to invert direction (motor mounted mirrored)
-        self.ticks_left, self.prev_enc_a_state = self._read_single_encoder(
-            self.ENC_A_PIN_B, self.ENC_A_PIN_A,
-            self.ticks_left, self.prev_enc_a_state
-        )
-        self.ticks_right, self.prev_enc_b_state = self._read_single_encoder(
-            self.ENC_B_PIN_A, self.ENC_B_PIN_B,
-            self.ticks_right, self.prev_enc_b_state
-        )
+    def _right_encoder_callback(self, channel):
+        """Interrupt callback for right encoder (both channels, both edges)."""
+        a = GPIO.input(self.ENC_B_PIN_A)
+        b = GPIO.input(self.ENC_B_PIN_B)
+        if channel == self.ENC_B_PIN_A:
+            self.ticks_right += 1 if a != b else -1
+        else:
+            self.ticks_right += 1 if a == b else -1
     
     def cmd_vel_callback(self, msg):
         """Convert Twist to wheel velocities"""
@@ -267,10 +273,9 @@ class MotorController(Node):
         return duty if velocity >= 0 else -duty
     
     def update_odometry(self, dt):
-        """Calculate odometry from commanded velocities (more stable than encoder-based)"""
-        # Use commanded velocities for odometry (encoder direction detection is unreliable)
-        v_left = self.target_vel_left
-        v_right = self.target_vel_right
+        """Calculate odometry from encoder-measured wheel velocities."""
+        v_left = self.measured_vel_left
+        v_right = self.measured_vel_right
 
         v_linear = (v_left + v_right) / 2.0
         v_angular = (v_right - v_left) / self.wheel_base
@@ -440,6 +445,13 @@ class MotorController(Node):
     def cleanup(self):
         """Shutdown cleanup"""
         self.stop_motors()
+        # Remove encoder interrupts before GPIO cleanup
+        for pin in (self.ENC_A_PIN_A, self.ENC_A_PIN_B,
+                    self.ENC_B_PIN_A, self.ENC_B_PIN_B):
+            try:
+                GPIO.remove_event_detect(pin)
+            except Exception:
+                pass
         self.pwm_a.stop()
         self.pwm_b.stop()
         GPIO.cleanup()

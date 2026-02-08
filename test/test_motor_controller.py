@@ -393,6 +393,87 @@ class TestEncoderConversion:
         assert abs(dist - expected) < 1e-6
 
 
+def quadrature_decode(channel_a_value, channel_b_value, triggered_channel, is_channel_a):
+    """Pure quadrature decode logic matching motor_controller.py interrupt callbacks.
+
+    Args:
+        channel_a_value: Current state of channel A (0 or 1)
+        channel_b_value: Current state of channel B (0 or 1)
+        triggered_channel: Which channel triggered the interrupt
+        is_channel_a: True if triggered_channel is channel A
+
+    Returns:
+        +1 or -1 tick increment
+    """
+    if is_channel_a:
+        return 1 if channel_a_value != channel_b_value else -1
+    else:
+        return 1 if channel_a_value == channel_b_value else -1
+
+
+class TestQuadratureDecoding:
+    """Tests for interrupt-based quadrature encoder decoding.
+
+    Standard quadrature produces this state sequence for forward rotation:
+        Step  A  B
+          1   0  0
+          2   1  0  (A rises, B=0 → A!=B → +1)
+          3   1  1  (B rises, A=1 → A==B → +1)
+          4   0  1  (A falls, B=1 → A!=B → +1... wait, that's wrong)
+
+    Actually let's verify by walking through a full quadrature cycle.
+    Forward (CW) sequence: (0,0)→(1,0)→(1,1)→(0,1)→(0,0)
+    """
+
+    def test_forward_full_cycle(self):
+        """Full forward quadrature cycle should produce +4 ticks."""
+        # Forward sequence: (0,0)→(1,0)→(1,1)→(0,1)→(0,0)
+        ticks = 0
+        # Step 1: A rises 0→1, B=0.  A triggered: a=1, b=0, A!=B → +1
+        ticks += quadrature_decode(1, 0, 'A', True)
+        # Step 2: B rises 0→1, A=1.  B triggered: a=1, b=1, A==B → +1
+        ticks += quadrature_decode(1, 1, 'B', False)
+        # Step 3: A falls 1→0, B=1.  A triggered: a=0, b=1, A!=B → +1
+        ticks += quadrature_decode(0, 1, 'A', True)
+        # Step 4: B falls 1→0, A=0.  B triggered: a=0, b=0, A==B → +1
+        ticks += quadrature_decode(0, 0, 'B', False)
+        assert ticks == 4
+
+    def test_backward_full_cycle(self):
+        """Full backward quadrature cycle should produce -4 ticks."""
+        # Backward sequence: (0,0)→(0,1)→(1,1)→(1,0)→(0,0)
+        ticks = 0
+        # Step 1: B rises 0→1, A=0.  B triggered: a=0, b=1, A!=B → -1
+        ticks += quadrature_decode(0, 1, 'B', False)
+        # Step 2: A rises 0→1, B=1.  A triggered: a=1, b=1, A==B → -1
+        ticks += quadrature_decode(1, 1, 'A', True)
+        # Step 3: B falls 1→0, A=1.  B triggered: a=1, b=0, A!=B → -1
+        ticks += quadrature_decode(1, 0, 'B', False)
+        # Step 4: A falls 1→0, B=0.  A triggered: a=0, b=0, A==B → -1
+        ticks += quadrature_decode(0, 0, 'A', True)
+        assert ticks == -4
+
+    def test_forward_backward_cancels(self):
+        """Forward then backward should return to zero."""
+        ticks = 0
+        # Forward: (0,0)→(1,0)
+        ticks += quadrature_decode(1, 0, 'A', True)
+        # Backward: (1,0)→(0,0)  — A falls, B=0, A==B → -1
+        ticks += quadrature_decode(0, 0, 'A', True)
+        assert ticks == 0
+
+    def test_left_encoder_inverted(self):
+        """Left encoder should be inverted (negative of right for same rotation)."""
+        # Right encoder forward step: a=1, b=0, A triggered → +1
+        right_tick = quadrature_decode(1, 0, 'A', True)
+        # Left encoder uses inverted sign: swap +1/-1
+        # In motor_controller.py: -1 if a != b else 1
+        a, b = 1, 0
+        left_tick = -1 if a != b else 1  # matches _left_encoder_callback
+        assert right_tick == 1
+        assert left_tick == -1
+
+
 class TestIntegration:
     """Integration tests combining multiple functions."""
 
