@@ -35,6 +35,13 @@ info()  { echo -e "${CYAN}[INFO]${NC}  $*"; }
 ok()    { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 fail()  { echo -e "${RED}[FAIL]${NC}  $*"; }
+need_manual_pull() {
+    warn "Local and remote branches have diverged or fast-forward is not possible."
+    warn "Resolve manually, then re-run this script:"
+    warn "  git status"
+    warn "  git fetch origin ${GIT_BRANCH}"
+    warn "  git merge --ff-only origin/${GIT_BRANCH}  # or resolve conflicts as needed"
+}
 
 # -------------------------------------------------------------------
 # 1. Verify robot is reachable
@@ -56,7 +63,15 @@ echo "--- Robot: pulling latest code ---"
 cd ${ROBOT_PKG_DIR}
 git fetch origin ${GIT_BRANCH}
 git checkout ${GIT_BRANCH}
-git pull origin ${GIT_BRANCH}
+if ! git pull --ff-only origin ${GIT_BRANCH}; then
+    echo "[WARN] Robot repository needs manual merge."
+    echo "[WARN] Run on robot:"
+    echo "  cd ${ROBOT_PKG_DIR}"
+    echo "  git status"
+    echo "  git fetch origin ${GIT_BRANCH}"
+    echo "  git merge --ff-only origin/${GIT_BRANCH}  # or resolve conflicts"
+    exit 1
+fi
 
 echo "--- Robot: building workspace ---"
 cd ${ROBOT_WS}
@@ -83,7 +98,10 @@ info "Pulling latest code on dev machine..."
 cd "$DEV_PKG_DIR"
 git fetch origin "$GIT_BRANCH"
 git checkout "$GIT_BRANCH"
-git pull origin "$GIT_BRANCH"
+if ! git pull --ff-only origin "$GIT_BRANCH"; then
+    need_manual_pull
+    exit 1
+fi
 ok "Dev code updated."
 
 info "Building dev workspace..."
