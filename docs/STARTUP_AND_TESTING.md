@@ -99,7 +99,7 @@ source ~/.bashrc
 ### 3. Pull latest code
 
 ```bash
-cd ~/dev_ws/src/my_robot_bringup
+cd ~/dev_ws/src/my_package
 git pull origin main
 ```
 
@@ -195,7 +195,7 @@ colcon test-result --verbose
 ### Using pytest directly
 
 ```bash
-cd ~/dev_ws/src/my_robot_bringup    # or ~/robot_ws/src/my_package
+cd ~/dev_ws/src/my_package    # or ~/robot_ws/src/my_package
 python3 -m pytest test/test_motor_controller.py -v
 ```
 

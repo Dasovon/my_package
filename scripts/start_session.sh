@@ -15,8 +15,9 @@ ROBOT_WS="\$HOME/robot_ws"
 ROBOT_PKG_DIR="\$HOME/robot_ws/src/my_package"
 
 DEV_WS="$HOME/dev_ws"
-DEV_PKG_DIR="$HOME/dev_ws/src/my_robot_bringup"
+DEV_PKG_DIR="$HOME/dev_ws/src/my_package"
 
+GIT_REPO="https://github.com/Dasovon/my_package.git"
 GIT_BRANCH="main"
 
 PULL_ONLY=false
@@ -47,11 +48,18 @@ fi
 ok "Robot is reachable."
 
 # -------------------------------------------------------------------
-# 2. Pull and build on the robot
+# 2. Pull (or clone) and build on the robot
 # -------------------------------------------------------------------
-info "Pulling latest code on ${ROBOT_HOST}..."
+info "Updating code on ${ROBOT_HOST}..."
 ssh "${ROBOT_USER}@${ROBOT_HOST}" bash -l <<REMOTE_SCRIPT
 set -euo pipefail
+
+if [ ! -d ${ROBOT_PKG_DIR} ]; then
+    echo "--- Robot: cloning repo (first time setup) ---"
+    mkdir -p \$(dirname ${ROBOT_PKG_DIR})
+    git clone ${GIT_REPO} ${ROBOT_PKG_DIR}
+fi
+
 echo "--- Robot: pulling latest code ---"
 cd ${ROBOT_PKG_DIR}
 git fetch origin ${GIT_BRANCH}
@@ -77,9 +85,16 @@ REMOTE_SCRIPT
 ok "Robot code updated and built."
 
 # -------------------------------------------------------------------
-# 3. Pull and build on dev machine
+# 3. Pull (or clone) and build on dev machine
 # -------------------------------------------------------------------
-info "Pulling latest code on dev machine..."
+info "Updating code on dev machine..."
+
+if [ ! -d "$DEV_PKG_DIR" ]; then
+    info "Cloning repo (first time setup)..."
+    mkdir -p "$(dirname "$DEV_PKG_DIR")"
+    git clone "$GIT_REPO" "$DEV_PKG_DIR"
+fi
+
 cd "$DEV_PKG_DIR"
 git fetch origin "$GIT_BRANCH"
 git checkout "$GIT_BRANCH"
