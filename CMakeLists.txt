@@ -42,4 +42,10 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+# Install utility scripts
+install(PROGRAMS
+  scripts/start_session.sh
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
