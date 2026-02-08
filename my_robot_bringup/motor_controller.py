@@ -267,10 +267,11 @@ class MotorController(Node):
         return duty if velocity >= 0 else -duty
     
     def update_odometry(self, dt):
-        """Calculate odometry from encoder velocities"""
-        v_left = self.measured_vel_left
-        v_right = self.measured_vel_right
-        
+        """Calculate odometry from commanded velocities (more stable than encoder-based)"""
+        # Use commanded velocities for odometry (encoder direction detection is unreliable)
+        v_left = self.target_vel_left
+        v_right = self.target_vel_right
+
         v_linear = (v_left + v_right) / 2.0
         v_angular = (v_right - v_left) / self.wheel_base
         
