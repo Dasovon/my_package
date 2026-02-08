@@ -62,11 +62,21 @@ colcon build --symlink-install
 source install/setup.bash
 ```
 
+Tip: paste the command **once**. If you accidentally paste it twice (e.g., `--symlink-installcolcon build`), `colcon` will report unrecognized arguments.
+
 If dependencies are missing:
 
 ```bash
 rosdep install --from-paths src --ignore-src -r -y
 ```
+
+On hoverbot, you may see:
+
+```
+my_robot_bringup: Cannot locate rosdep definition for [python3-rpi.gpio]
+```
+
+This is expected on the Pi. It uses the OS package (`python3-rpi.gpio`) and is already satisfied, so you can ignore the warning and continue.
 
 Then rebuild.
 
