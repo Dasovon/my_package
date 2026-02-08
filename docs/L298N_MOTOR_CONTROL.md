@@ -74,11 +74,11 @@ Temporary motor control setup using L298N dual H-bridge driver to test ROS 2 dif
 
 ## Critical Parameters
 
-### Minimum Duty Cycle: 60%
+### Minimum Duty Cycle: 80%
 
 **Why:** DG01D-E motors require high breakaway torque
-- Below 60%: Motors won't start (static friction too high)
-- At 60%: Reliable starting
+- Below 80%: Motors won't start (static friction too high)
+- At 80%: Reliable starting
 - Manual push test at 30%: Motors maintain rotation but won't start
 
 **Implemented in:** `motor_controller.py` → `velocity_to_duty()` function
@@ -93,16 +93,16 @@ Temporary motor control setup using L298N dual H-bridge driver to test ROS 2 dif
 # max_speed = 0.5 m/s
 # velocity = 0.2 m/s
 # velocity_fraction = 0.2 / 0.5 = 0.4
-# duty = 60 + (0.4 * (100 - 60)) = 60 + 16 = 76%
+# duty = 80 + (0.4 * (100 - 80)) = 80 + 8 = 88%
 ```
 
-**Key point:** Any non-zero velocity maps to minimum 60% duty cycle
+**Key point:** Any non-zero velocity maps to minimum 80% duty cycle
 
-### Ramping Rate: 4% per iteration
+### Ramping Rate: 10% per iteration
 
-**Control loop:** 50 Hz (0.02 second interval)  
-**Ramp rate:** 4% duty cycle change per iteration  
-**Time to reach 60% from 0%:** ~15 iterations = 0.3 seconds  
+**Control loop:** 50 Hz (0.02 second interval)
+**Ramp rate:** 10% duty cycle change per iteration
+**Time to reach 80% from 0%:** ~8 iterations = 0.16 seconds
 
 **Why ramping:**
 - Smooth acceleration (motor-friendly)
@@ -123,9 +123,10 @@ Temporary motor control setup using L298N dual H-bridge driver to test ROS 2 dif
 ```yaml
 motor_controller:
   ros__parameters:
-    wheel_base: 0.179        # Distance between wheels (m) - ESTIMATE
+    wheel_base: 0.165        # Distance between wheels (m)
+    wheel_diameter: 0.06475  # Wheel diameter (m)
     max_speed: 0.5           # Maximum linear velocity (m/s)
-    min_duty_cycle: 60       # Minimum PWM for starting
+    min_duty_cycle: 80       # Minimum PWM for starting
     max_duty_cycle: 100      # Maximum PWM
     pwm_frequency: 1000      # PWM frequency (Hz)
 ```
@@ -241,11 +242,11 @@ install(PROGRAMS
 
 ## Known Issues & Limitations
 
-### Issue 1: No Wheel Encoders
+### Issue 1: ~~No Wheel Encoders~~ (RESOLVED)
 
-**Impact:** Cannot measure actual wheel velocity or distance traveled  
-**Workaround:** Using open-loop control (no feedback)  
-**Future:** Hoverboard motors have hall effect sensors for encoder feedback
+**Status:** Hall effect encoders now integrated (576 ticks/rev)
+**Implementation:** Quadrature encoder reading at 100 Hz
+**Output:** Odometry published to `/odom` topic with TF transforms
 
 ### Issue 2: L298N Voltage Drop
 
@@ -254,11 +255,11 @@ install(PROGRAMS
 **Impact:** Requires higher battery voltage than motor nominal  
 **Future:** Hoverboard motor controller more efficient
 
-### Issue 3: Wheel Base Estimate
+### Issue 3: Wheel Base Measurement
 
-**Current:** `wheel_base: 0.179 m` is estimated, not measured  
-**Impact:** Rotation calculations may be inaccurate  
-**Fix:** Measure actual distance between wheel centers when mounted
+**Current:** `wheel_base: 0.165 m` measured
+**Impact:** Rotation calculations should be accurate
+**Note:** Verify measurement if robot doesn't turn correctly
 
 ### Issue 4: No Load Testing Only
 
@@ -276,7 +277,7 @@ install(PROGRAMS
 
 **Check:**
 1. Battery voltage (should be 6-9V)
-2. PWM duty cycle reaching 60% minimum
+2. PWM duty cycle reaching 80% minimum
 3. GPIO permissions (`groups` should show `gpio` and `dialout`)
 4. Physical wiring connections
 
@@ -357,7 +358,7 @@ v_right = linear.x + (angular.z * wheel_base / 2.0)
 
 3. **Parameters to Update:**
    - `max_speed` (likely higher with hoverboard motors)
-   - `min_duty_cycle` (may not need 60% minimum)
+   - `min_duty_cycle` (may not need 80% minimum)
    - `wheel_base` (measure actual distance)
    - Add encoder parameters (ticks per revolution, gear ratio)
 
@@ -391,12 +392,14 @@ v_right = linear.x + (angular.z * wheel_base / 2.0)
 - Keyboard teleoperation
 - Differential drive kinematics
 - Safety features (watchdog, emergency stop)
+- Hall effect encoder feedback (576 ticks/rev)
+- Odometry publishing (`/odom` topic + TF)
+- Encoder tick clamping (noise rejection)
 
 **Not Implemented:**
-- Encoder feedback (no encoders connected)
-- Odometry publishing (no velocity measurement)
 - Closed-loop speed control (open-loop only)
 - Ground testing (bench testing only)
+- Battery voltage monitoring
 
 **Next Steps:**
 - Continue Articulated Robotics tutorial series

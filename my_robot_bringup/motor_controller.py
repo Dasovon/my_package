@@ -11,8 +11,10 @@ import math
 import os
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from geometry_msgs.msg import Twist, TransformStamped, Quaternion
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import JointState
 import RPi.GPIO as GPIO
 from tf2_ros import TransformBroadcaster
 
@@ -24,7 +26,7 @@ class MotorController(Node):
         # Declare parameters
         self.declare_parameter('wheel_base', 0.165)
         self.declare_parameter('wheel_diameter', 0.06475)
-        self.declare_parameter('encoder_ticks_per_rev', 576)
+        self.declare_parameter('encoder_ticks_per_rev', 288)  # 3 pulses * 2 edges * 48:1 gear
         self.declare_parameter('max_speed', 0.5)
         self.declare_parameter('max_angular_speed', 2.0)
         self.declare_parameter('min_duty_cycle', 80)  # Increased from 60
@@ -112,15 +114,22 @@ class MotorController(Node):
             Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         
         self.odom_pub = self.create_publisher(Odometry, 'odom', 10)
+        # Use BEST_EFFORT QoS to match robot_state_publisher's subscription
+        joint_state_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+        self.joint_state_pub = self.create_publisher(JointState, 'joint_states', joint_state_qos)
         self.tf_broadcaster = TransformBroadcaster(self)
         
         # Timers
         self.control_timer = self.create_timer(0.02, self.control_loop)  # 50 Hz
-        self.encoder_timer = self.create_timer(0.01, self.read_encoders)  # 100 Hz
+        self.encoder_timer = self.create_timer(0.002, self.read_encoders)  # 500 Hz for better tick capture
         self.watchdog_timer = self.create_timer(0.1, self.watchdog_check)
         
         self.get_logger().info('Motor controller initialized')
-        self.get_logger().info(f'DG01D-E: 1:48 ratio, 576 ticks/rev')
+        self.get_logger().info(f'DG01D-E: 1:48 ratio, {self.ticks_per_rev} ticks/rev')
         self.get_logger().info(f'Wheel base: {self.wheel_base:.3f} m')
         self.get_logger().info(f'Min duty: {self.min_duty}%')
     
@@ -172,8 +181,9 @@ class MotorController(Node):
 
     def read_encoders(self):
         """Quadrature encoder reading"""
+        # Swap A/B pins for left encoder to invert direction (motor mounted mirrored)
         self.ticks_left, self.prev_enc_a_state = self._read_single_encoder(
-            self.ENC_A_PIN_A, self.ENC_A_PIN_B,
+            self.ENC_A_PIN_B, self.ENC_A_PIN_A,
             self.ticks_left, self.prev_enc_a_state
         )
         self.ticks_right, self.prev_enc_b_state = self._read_single_encoder(
@@ -257,10 +267,11 @@ class MotorController(Node):
         return duty if velocity >= 0 else -duty
     
     def update_odometry(self, dt):
-        """Calculate odometry from encoder velocities"""
-        v_left = self.measured_vel_left
-        v_right = self.measured_vel_right
-        
+        """Calculate odometry from commanded velocities (more stable than encoder-based)"""
+        # Use commanded velocities for odometry (encoder direction detection is unreliable)
+        v_left = self.target_vel_left
+        v_right = self.target_vel_right
+
         v_linear = (v_left + v_right) / 2.0
         v_angular = (v_right - v_left) / self.wheel_base
         
@@ -278,6 +289,7 @@ class MotorController(Node):
         
         # Publish
         self.publish_odometry(v_linear, v_angular)
+        self.publish_joint_states()
     
     def publish_odometry(self, v_linear, v_angular):
         """Publish odometry and TF"""
@@ -330,7 +342,30 @@ class MotorController(Node):
         ]
 
         self.odom_pub.publish(odom)
-    
+
+    def publish_joint_states(self):
+        """Publish wheel joint states from encoder ticks."""
+        current_time = self.get_clock().now()
+
+        # Convert encoder ticks to radians
+        # radians = (ticks / ticks_per_rev) * 2 * pi
+        radians_per_tick = (2.0 * math.pi) / self.ticks_per_rev
+        left_wheel_pos = self.ticks_left * radians_per_tick
+        right_wheel_pos = self.ticks_right * radians_per_tick
+
+        # Calculate wheel velocities in rad/s
+        left_wheel_vel = self.measured_vel_left / (self.wheel_diameter / 2.0)
+        right_wheel_vel = self.measured_vel_right / (self.wheel_diameter / 2.0)
+
+        js = JointState()
+        js.header.stamp = current_time.to_msg()
+        js.name = ['left_wheel_joint', 'right_wheel_joint']
+        js.position = [left_wheel_pos, right_wheel_pos]
+        js.velocity = [left_wheel_vel, right_wheel_vel]
+        js.effort = []
+
+        self.joint_state_pub.publish(js)
+
     def yaw_to_quaternion(self, yaw):
         """Convert yaw to quaternion"""
         quat = Quaternion()
