@@ -118,6 +118,12 @@ sudo chmod 666 /dev/ttyUSB0
 ros2 launch my_robot_bringup full_bringup.launch.py
 ```
 
+If the motor controller exits with GPIO warnings or `RuntimeError: Failed to add edge detection`, another process likely has the GPIO pins in use (or they were left in a bad state). Stop any other ROS/motor processes, wait a few seconds, and relaunch. If it persists, reboot the Pi to clear GPIO state:
+
+```bash
+sudo reboot
+```
+
 This starts:
 
 1. **Robot State Publisher** (URDF + TF)
