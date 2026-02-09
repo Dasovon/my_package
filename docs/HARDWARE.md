@@ -1,166 +1,338 @@
-# Hardware Bill of Materials
+# Hoverbot Hardware Reference
 
-Complete hardware specifications and bill of materials for the Hoverbot mobile robot.
-Current development runs on a small DC gearmotor chassis with L298N motor control before the hoverboard drive upgrade.
+Complete hardware specifications, wiring, motor configuration, and software dependencies.
+
+---
+
+## Robot Physical Specifications
+
+### Chassis (URDF)
+- **Base length:** 0.179 m
+- **Base width:** 0.165 m
+- **Base height:** 0.022 m
+- **Base mass (URDF placeholder):** 5.0 kg
+
+### Wheels
+- **Wheel radius:** 0.032375 m
+- **Wheel diameter:** 0.06475 m
+- **Wheel width:** 0.058 m
+- **Wheel base (distance between wheels):** 0.165 m
+- **Wheel circumference:** 0.2034 m
+
+### Encoders (DG01D-E)
+- **Resolution:** 288 ticks per wheel revolution (3 pulses x 2 edges x 48:1 gear ratio)
+- **Distance per tick:** 0.706 mm
+- **Decoding method:** Interrupt-based quadrature via `GPIO.add_event_detect()`
 
 ---
 
 ## Computing Hardware
 
 ### Development PC ("dev")
-- **Type:** Desktop/Laptop
-- **OS:** Ubuntu 22.04.5 LTS (Jammy Jellyfish)
-- **CPU:** x86_64 (Intel/AMD)
+- **OS:** Ubuntu 22.04 LTS Desktop (x86_64)
 - **RAM:** 8GB+ recommended
 - **Storage:** 50GB+ free space
-- **Network:** WiFi or Ethernet
 - **Hostname:** dev
-- **IP Address:** (set per network)
+- **ROS install:** `ros-humble-desktop`
+- **Workspace:** `~/dev_ws`
 
 ### Robot Computer ("hoverbot")
 - **Model:** Raspberry Pi 4 or 5
 - **RAM:** 4GB minimum, 8GB recommended
-- **OS:** Ubuntu 22.04.5 LTS Server (ARM64)
-- **Storage:** 32GB+ microSD card (Class 10, A2 rated recommended)
-- **Power:** 5V 3A USB-C power supply
-- **Network:** WiFi or Ethernet
+- **OS:** Ubuntu 22.04 LTS Server (ARM64)
+- **Storage:** 32GB+ microSD card (Class 10, A2 rated)
+- **Power:** 5V 3A USB-C
 - **Hostname:** hoverbot
 - **IP Address:** 192.168.86.33
-- **Disk Space:** 49GB free (after OS and ROS installation)
+- **ROS install:** `ros-humble-ros-base`
+- **Workspace:** `~/robot_ws`
+
+### Network
+- **Subnet:** 192.168.86.0/24
+- **ROS_DOMAIN_ID:** 42
+- **Router:** 802.11ac or better (2.4GHz and/or 5GHz)
 
 ---
 
 ## Sensors
 
 ### RPLIDAR A1 - 2D Laser Scanner
-- **Status:** Integrated and in use
-- **Type:** 360° 2D laser range scanner
+- **Status:** Integrated
 - **Range:** 0.15m - 12m
 - **Sample Rate:** 8000 samples/second
-- **Scan Rate:** 5.5 Hz (typical)
-- **Angular Resolution:** 1°
+- **Scan Rate:** 5.5 Hz
+- **Angular Resolution:** 1 degree
 - **Interface:** USB (via UART adapter)
-- **Power:** 5V via USB (no separate power needed)
-- **ROS Driver:** `rplidar_ros` (ROS 2 package)
+- **Power:** 5V via USB
+- **ROS Driver:** `rplidar_ros`
 - **Frame ID:** `laser` or `laser_frame`
 
 ### BNO055 - 9-Axis IMU
 - **Status:** Planned
-- **Type:** 9-DOF Absolute Orientation Sensor
-- **Sensors:** 3-axis accelerometer, 3-axis gyroscope, 3-axis magnetometer
-- **Output:** Quaternion, Euler angles, linear acceleration, gravity vector
+- **Sensors:** Accelerometer, gyroscope, magnetometer
 - **Interface:** I2C or UART
 - **Update Rate:** Up to 100Hz
-- **ROS Driver:** `bno055` package or custom node
+- **ROS Driver:** `bno055` package
 - **Frame ID:** `imu_link`
 
 ### Intel RealSense D435i - Depth Camera
 - **Status:** Planned
-- **Type:** Stereo depth camera with IMU
-- **Depth Range:** 0.3m - 3m (typical), up to 10m max
+- **Depth Range:** 0.3m - 3m (typical), up to 10m
 - **Resolution:** 1280x720 @ 30fps (depth), 1920x1080 @ 30fps (RGB)
-- **Field of View:** 87° × 58° (depth), 69° × 42° (RGB)
-- **Interface:** USB 3.0 (USB-C connector)
-- **Power:** 5V via USB (2.5W typical)
-- **ROS Driver:** `realsense-ros` (official ROS 2 package)
-- **Frame IDs:** `camera_link`, `camera_depth_frame`, `camera_color_frame`
+- **Interface:** USB 3.0
+- **ROS Driver:** `realsense-ros`
 
 ---
 
-## Actuators
+## Motor System (L298N + DG01D-E)
 
-### Small DC Gearmotor Chassis (Current)
-- **Status:** In use
-- **Motor Type:** DG01D-E with encoders
-- **Motor Driver:** L298N dual H-bridge
-- **Wheel Diameter:** 65mm
-- **Wheelbase:** 165mm
+### Current Drive Platform
+- **Motors:** DG01D-E DC gearmotors (6V nominal, 3-9V range, 1:48 gear ratio)
+- **Driver:** L298N dual H-bridge
+- **Motor power:** 6-9V battery
+- **Logic power:** 5V from Pi (via L298N onboard regulator)
+- **Common ground:** Battery GND connected to Pi GND
 
-### Hoverboard Motor Controller (Next Platform)
-- **Status:** Planned, not yet integrated
-- **Type:** Dual brushless DC motor controller (from hoverboard)
-- **Interface:** UART (bidirectional control)
-- **Voltage:** 36V nominal battery input
-- **Current:** 15A per motor (typical)
-- **Safety Features:** Current limiting, voltage monitoring, emergency stop
-- **Control Mode:** Velocity commands via `/cmd_vel` topic
-- **Odometry:** Wheel encoders for `/odom` topic
+### L298N Limitations
+- **Voltage drop:** ~2V (9V battery -> ~7V to motors)
+- **Current limit:** 2A per channel (marginal for stall)
+- **Efficiency:** ~60-70%
+
+### Motor Direction Calibration
+
+| Motor | Code Configuration |
+|-------|-------------------|
+| Motor A (Left) | **INVERTED** -- `set_motor_a()` has IN1/IN2 swapped in code |
+| Motor B (Right) | **NORMAL** -- IN3/IN4 standard |
+
+Physical motors are wired opposite each other. Software inversion compensates without rewiring.
+
+### Critical Parameters
+
+**Minimum Duty Cycle: 80%** -- DG01D-E motors require high breakaway torque. Below 80%, motors won't start reliably.
+
+**Velocity Mapping:**
+```python
+# velocity_fraction = abs(velocity) / max_speed
+# duty = min_duty + (velocity_fraction * (max_duty - min_duty))
+# Any non-zero velocity maps to minimum 80% duty cycle
+```
+
+**Ramping:** 10% duty cycle change per iteration at 50 Hz control loop (0.16s to reach 80% from 0%).
 
 ---
 
-## Power System
+## GPIO Pin Mapping
 
-### Battery (Planned)
-- **Type:** Lithium-ion or LiFePO4
-- **Voltage:** 36V nominal (10S Li-ion)
+All pins are declared as ROS 2 parameters in `motor_controller.py` (with physical pin defaults) and overridden via `config/motor_controller.yaml` with BCM GPIO numbers. The code uses `GPIO.setmode(GPIO.BCM)`.
+
+### Motor A (Left Wheel)
+
+| Function | Physical Pin | BCM GPIO | ROS Parameter | L298N Terminal |
+|----------|-------------|----------|---------------|----------------|
+| Enable (PWM) | 11 | GPIO 17 | `motor_enable_a_pin` | ENA |
+| Direction 1 | 13 | GPIO 27 | `motor_in1_pin` | IN1 |
+| Direction 2 | 15 | GPIO 22 | `motor_in2_pin` | IN2 |
+
+### Motor B (Right Wheel)
+
+| Function | Physical Pin | BCM GPIO | ROS Parameter | L298N Terminal |
+|----------|-------------|----------|---------------|----------------|
+| Enable (PWM) | 33 | GPIO 13 | `motor_enable_b_pin` | ENB |
+| Direction 1 | 35 | GPIO 19 | `motor_in3_pin` | IN3 |
+| Direction 2 | 37 | GPIO 26 | `motor_in4_pin` | IN4 |
+
+### Encoder Inputs (Interrupt-based Quadrature)
+
+Encoders use `GPIO.add_event_detect()` on both channels for accurate quadrature decoding with a state machine lookup table.
+
+| Function | Physical Pin | BCM GPIO | ROS Parameter |
+|----------|-------------|----------|---------------|
+| Left Encoder H1 | 16 | GPIO 23 | `encoder_left_a_pin` |
+| Left Encoder H2 | 18 | GPIO 24 | `encoder_left_b_pin` |
+| Right Encoder H1 | 22 | GPIO 25 | `encoder_right_a_pin` |
+| Right Encoder H2 | 29 | GPIO 5 | `encoder_right_b_pin` |
+
+### Encoder Configuration
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `encoder_ticks_per_rev` | 288 | 3 pulses x 2 edges x 48:1 gear ratio |
+| `encoder_left_inverted` | True | Compensates for mirrored left motor mount |
+| `encoder_right_inverted` | False | Normal direction |
+| `encoder_bouncetime_ms` | 1 | GPIO edge detection debounce (ms) |
+
+### Encoder Power
+- **+5V:** Physical pins 2 or 4
+- **GND:** Physical pins 6 or 9
+
+---
+
+## ROS 2 Motor Configuration
+
+### Full Parameter Set (`config/motor_controller.yaml`)
+```yaml
+motor_controller:
+  ros__parameters:
+    wheel_base: 0.165              # Distance between wheels (m)
+    wheel_diameter: 0.06475        # Wheel diameter (m)
+    encoder_ticks_per_rev: 288     # 3 pulses x 2 edges x 48:1 gear
+    max_speed: 0.5                 # Maximum linear velocity (m/s)
+    max_angular_speed: 2.0         # Maximum angular velocity (rad/s)
+    min_duty_cycle: 80             # Minimum PWM for starting
+    max_duty_cycle: 100            # Maximum PWM
+    pwm_frequency: 1000            # PWM frequency (Hz)
+    max_tick_delta: 1200           # Encoder tick delta clamp
+    odom_frame: "odom"
+    base_frame: "base_footprint"
+    encoder_left_inverted: true
+    encoder_right_inverted: false
+    encoder_bouncetime_ms: 1
+    enable_debug_logging: false
+    # Pin assignments (BCM GPIO numbers)
+    motor_enable_a_pin: 17
+    motor_in1_pin: 27
+    motor_in2_pin: 22
+    motor_enable_b_pin: 13
+    motor_in3_pin: 19
+    motor_in4_pin: 26
+    encoder_left_a_pin: 23
+    encoder_left_b_pin: 24
+    encoder_right_a_pin: 25
+    encoder_right_b_pin: 5
+```
+
+### Safety Features
+- **Watchdog timeout:** 1 second (auto-stop if no `/cmd_vel` commands)
+- **Emergency stop:** Ctrl+C triggers GPIO cleanup
+- **PWM ramping:** Prevents sudden motor jerks
+- **Velocity clamping:** Within configured max limits
+- **Encoder tick clamping:** Rejects noise spikes > `max_tick_delta`
+- **GPIO validation:** Checks `/dev/gpiomem` or `/dev/mem` access before setup
+
+### ROS 2 Topics
+
+| Topic | Direction | Type | Rate |
+|-------|-----------|------|------|
+| `/cmd_vel` | Subscribe | `geometry_msgs/msg/Twist` | - |
+| `/odom` | Publish | `nav_msgs/msg/Odometry` | 50 Hz |
+| `/joint_states` | Publish | `sensor_msgs/msg/JointState` | 50 Hz |
+| `/tf` | Publish | `tf2_msgs/msg/TFMessage` | 50 Hz |
+
+TF tree: `odom` -> `base_footprint` -> `base_link` -> sensors
+
+---
+
+## Differential Drive Kinematics
+
+**Wheel Velocities:**
+```python
+v_left  = linear.x - (angular.z * wheel_base / 2.0)
+v_right = linear.x + (angular.z * wheel_base / 2.0)
+```
+
+| Command | linear.x | angular.z | v_left | v_right | Result |
+|---------|----------|-----------|--------|---------|--------|
+| Forward | 0.2 | 0.0 | 0.2 | 0.2 | Straight forward |
+| Backward | -0.2 | 0.0 | -0.2 | -0.2 | Straight backward |
+| Rotate Left | 0.0 | 0.8 | -0.072 | 0.072 | Spin counter-clockwise |
+| Arc Left | 0.2 | 0.3 | 0.173 | 0.227 | Curved forward-left |
+
+---
+
+## Power System (Planned - Hoverboard Platform)
+
+### Battery
+- **Type:** Li-ion or LiFePO4, 36V nominal (10S)
 - **Capacity:** 10Ah+ recommended
-- **BMS:** Built-in battery management system required
-- **Connectors:** XT60 or Anderson Powerpole
+- **BMS:** Required
+
+### Voltage Regulation
+- **36V -> 5V:** Buck converter (3A+ for Pi + sensors)
+- **36V -> 12V:** Optional (accessories)
+- **Fuses:** Inline for all power branches
 
 ### Power Distribution
-- **Robot Computer:** 5V 3A USB-C (from buck converter)
-- **RPLIDAR:** 5V via USB (from Pi or separate regulator)
-- **RealSense:** 5V via USB (from Pi USB 3.0 port)
-- **IMU:** 3.3V/5V (from Pi GPIO or I2C)
+- **Pi:** 5V 3A USB-C (from buck converter)
+- **RPLIDAR:** 5V via USB
+- **RealSense:** 5V via USB 3.0
+- **IMU:** 3.3V/5V (from Pi GPIO/I2C)
 - **Motors:** 36V direct from battery
 
-### Voltage Regulation (Planned)
-- **36V → 5V:** Buck converter (3A+ rating for Pi + sensors)
-- **36V → 12V:** Optional (for accessories)
-- **Fuses:** Inline fuses for all power branches
+---
+
+## Software Dependencies
+
+### On Robot (Raspberry Pi)
+```bash
+sudo apt install python3-rpi.gpio
+# Or: pip3 install RPi.GPIO --break-system-packages
+```
+- Motor control: `RPi.GPIO`
+- Sensor drivers: `rplidar_ros`
+- Core ROS 2: `rclpy`, message packages, `tf2_ros`
+- Robot description: `xacro`, `robot_state_publisher`
+
+### On Dev Machine (additionally)
+```bash
+sudo apt install ros-humble-gazebo-ros-pkgs ros-humble-rviz2
+```
+
+### All ROS 2 Dependencies
+```bash
+cd ~/robot_ws  # or ~/dev_ws
+rosdep install --from-paths src --ignore-src -r -y
+```
 
 ---
 
-## Mechanical Hardware
+## Safety Considerations
 
-### Chassis
-- **Type:** Custom CAD design
-- **Material:** TBD (acrylic, aluminum, 3D printed parts)
-- **Mounting:** RPLIDAR on top center, cameras at front, IMU near center of mass
+### Electrical
+- 36V battery requires proper BMS and handling
+- Reverse polarity protection on all power connections
+- Inline fuses to prevent overcurrent damage
+- Proper wire gauge for current loads
 
-### Drive Base
-- **Type:** Hoverboard drive platform (differential drive)
-- **Wheels:** Two driven wheels (hoverboard motors)
-- **Casters:** Passive caster(s) for stability
-- **Wheel Diameter:** ~6.5 inches (typical hoverboard wheel)
-- **Wheelbase:** ~450mm (typical hoverboard width)
-
----
-
-## Network Hardware
-
-### Router/Access Point
-- **Type:** Home WiFi router or dedicated travel router
-- **Standard:** 802.11ac or better
-- **Band:** 2.4GHz and/or 5GHz
-- **Network:** 192.168.86.0/24 (current home network)
-
-### Cables
-- **SSH/Development:** Ethernet cable (optional, using WiFi currently)
-- **USB:** USB-A to Micro-USB (RPLIDAR), USB-C (RealSense)
-
----
-
-## Development Tools
+### Mechanical
+- Emergency stop button (physical or software)
+- Current limiting on motors
+- Test bench setup before full assembly (wheels off ground)
 
 ### Software
-- **ROS Version:** ROS 2 Humble
-- **IDE:** VS Code with Remote-SSH extension
-- **Version Control:** Git + GitHub
-- **Build Tool:** colcon
-- **Visualization:** RViz2
+- Velocity limits in code
+- Watchdog timer for motor commands
+- Safe startup/shutdown procedures
 
-### Accessories
-- **Keyboard/Mouse:** For robot setup (can be removed after SSH configured)
-- **Monitor:** HDMI (temporary, for Pi setup)
-- **SD Card Reader:** For flashing Pi OS
+---
+
+## Migration Path to Hoverboard Motors
+
+**Hardware changes:**
+- Remove L298N, connect hoverboard motor controller via UART
+- Configure serial protocol
+
+**Software changes:**
+- Replace GPIO motor control with serial commands in `motor_controller.py`
+- Add hall sensor encoder feedback reading
+- Update velocity mapping for hoverboard motor characteristics
+
+**Parameters to update:**
+- `max_speed` (likely higher)
+- `min_duty_cycle` (may not need 80%)
+- `wheel_base` (measure actual distance)
+
+**Keep unchanged:**
+- Differential drive kinematics math
+- ROS 2 node structure and `/cmd_vel` interface
+- Keyboard teleop
 
 ---
 
 ## Estimated Costs (USD)
 
-| Item | Quantity | Unit Price | Total |
-|------|----------|------------|-------|
+| Item | Qty | Price | Total |
+|------|-----|-------|-------|
 | Raspberry Pi 4/5 (4GB) | 1 | $55-75 | $55-75 |
 | MicroSD Card (32GB+) | 1 | $10-15 | $10-15 |
 | RPLIDAR A1 | 1 | $99 | $99 |
@@ -173,44 +345,16 @@ Current development runs on a small DC gearmotor chassis with L298N motor contro
 | Cables, connectors, misc | - | $30-50 | $30-50 |
 | **Total** | | | **$743-1068** |
 
-*Prices are estimates and may vary by supplier and location.*
-
 ---
 
 ## Datasheets and References
 
-- **RPLIDAR A1:** [Slamtec RPLIDAR A1 Manual](https://www.slamtec.com/en/Lidar/A1Spec)
-- **BNO055:** [Bosch BNO055 Datasheet](https://www.bosch-sensortec.com/products/smart-sensors/bno055/)
-- **RealSense D435i:** [Intel RealSense D435i Datasheet](https://www.intelrealsense.com/depth-camera-d435i/)
-- **Raspberry Pi 4:** [Official Raspberry Pi Documentation](https://www.raspberrypi.org/documentation/)
-
----
-
-## Safety Considerations
-
-### Electrical
-- ⚠️ **36V battery requires proper BMS and handling**
-- ⚠️ **Reverse polarity protection on all power connections**
-- ⚠️ **Inline fuses to prevent overcurrent damage**
-- ⚠️ **Proper wire gauge for current loads**
-
-### Mechanical
-- ⚠️ **Emergency stop button (physical or software)**
-- ⚠️ **Current limiting on motors to prevent damage**
-- ⚠️ **Test bench setup before full assembly (wheels off ground)**
-
-### Software
-- ⚠️ **Velocity limits in code**
-- ⚠️ **Watchdog timer for motor commands**
-- ⚠️ **Safe startup/shutdown procedures**
-
----
-
-## Future Additions (Wishlist)
-
-- Lidar upgrade: RPLIDAR S2/S3 or Ouster OS0
-- GPS module for outdoor navigation
-- Additional cameras (stereo vision, fisheye)
-- Gripper or manipulator arm
-- LED status indicators
-- Speaker for audio feedback
+- [L298N Datasheet](https://www.st.com/resource/en/datasheet/l298.pdf)
+- [DG01D-E Motor Specs](https://cdn.sparkfun.com/assets/8/3/b/e/4/DS-16413-DG01D-E_Motor_with_Encoder.pdf)
+- [RPLIDAR A1 Manual](https://www.slamtec.com/en/Lidar/A1Spec)
+- [BNO055 Datasheet](https://www.bosch-sensortec.com/products/smart-sensors/bno055/)
+- [RealSense D435i](https://www.intelrealsense.com/depth-camera-d435i/)
+- [Raspberry Pi Documentation](https://www.raspberrypi.org/documentation/)
+- [geometry_msgs/Twist](https://docs.ros2.org/latest/api/geometry_msgs/msg/Twist.html)
+- [RPi.GPIO Documentation](https://pypi.org/project/RPi.GPIO/)
+- [REP-105: Coordinate Frames](https://www.ros.org/reps/rep-0105.html)

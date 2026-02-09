@@ -14,7 +14,7 @@ A battery-powered mobile robot that currently runs on a small DC gearmotor chass
 - **Drive System (next):** Hoverboard motor controller (planned)
 - **Sensors:**
   - RPLIDAR A1 (2D lidar) - *Integrated*
-  - Wheel encoders (Hall effect, 576 ticks/rev) - *Integrated*
+  - Wheel encoders (Hall effect, 288 ticks/rev) - *Integrated*
   - BNO055 IMU - *Planned*
   - Intel RealSense D435i depth camera - *Planned*
 
@@ -95,13 +95,9 @@ You should see "Hello World" messages flowing from hoverbot to dev.
 
 ## Documentation
 
-- **[SETUP.md](docs/SETUP.md)** - Complete setup guide from scratch
-- **[HARDWARE.md](docs/HARDWARE.md)** - Bill of materials and specifications
-- **[HARDWARE_REQUIREMENTS.md](docs/HARDWARE_REQUIREMENTS.md)** - Detailed hardware specifications
+- **[HARDWARE.md](docs/HARDWARE.md)** - Hardware specs, wiring, GPIO pins, motor config, BOM
+- **[GUIDE.md](docs/GUIDE.md)** - Setup, daily operations, and troubleshooting
 - **[TODO.md](docs/TODO.md)** - Project roadmap and next steps
-- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Common issues and solutions
-- **[L298N_MOTOR_CONTROL.md](docs/L298N_MOTOR_CONTROL.md)** - L298N motor driver guide
-- **[ENCODER_ODOMETRY_COMPLETE.md](docs/ENCODER_ODOMETRY_COMPLETE.md)** - Encoder odometry setup
 
 ---
 
@@ -137,14 +133,9 @@ my_robot_bringup/
 │   ├── empty.world              # Empty simulation world
 │   └── obstacles.world          # World with obstacles
 └── docs/                        # Documentation
-    ├── SETUP.md                 # Complete setup guide
-    ├── HARDWARE.md              # Bill of materials
-    ├── HARDWARE_REQUIREMENTS.md # Hardware specifications
-    ├── TODO.md                  # Project roadmap
-    ├── TROUBLESHOOTING.md       # Common issues
-    ├── L298N_MOTOR_CONTROL.md   # Motor control guide
-    ├── ENCODER_ODOMETRY_COMPLETE.md  # Odometry setup
-    └── AUDIT_REPORT.md          # Repository audit
+    ├── HARDWARE.md              # Hardware specs, wiring, motor config
+    ├── GUIDE.md                 # Setup, operations, troubleshooting
+    └── TODO.md                  # Project roadmap
 ```
 
 ---
