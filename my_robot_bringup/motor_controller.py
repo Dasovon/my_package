@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""
-Differential Drive Motor Controller with Hall Effect Encoders
+# Copyright (c) 2026 Ryan
+# SPDX-License-Identifier: MIT
+"""Differential drive motor controller with hall effect encoders.
+
 - DG01D-E motors (1:48 gear ratio, 576 ticks/rev)
 - L298N dual H-bridge driver
 - Open-loop velocity control (encoders for odometry only)
@@ -9,20 +11,23 @@ Differential Drive Motor Controller with Hall Effect Encoders
 
 import math
 import os
+
 import rclpy
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from geometry_msgs.msg import Twist, TransformStamped, Quaternion
-from nav_msgs.msg import Odometry
-from sensor_msgs.msg import JointState
 import RPi.GPIO as GPIO
+from geometry_msgs.msg import Quaternion, TransformStamped, Twist
+from nav_msgs.msg import Odometry
+from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from sensor_msgs.msg import JointState
 from tf2_ros import TransformBroadcaster
 
 
 class MotorController(Node):
+    """Control motors, encoders, and odometry publishing."""
+
     def __init__(self):
         super().__init__('motor_controller')
-        
+
         # Declare parameters
         self.declare_parameter('wheel_base', 0.165)
         self.declare_parameter('wheel_diameter', 0.06475)
@@ -70,7 +75,7 @@ class MotorController(Node):
         # Calculate wheel geometry
         self.wheel_circumference = math.pi * self.wheel_diameter
         self.meters_per_tick = self.wheel_circumference / self.ticks_per_rev
-        
+
         # Motor control GPIO pins
         self.ENABLE_A = self.get_parameter('motor_enable_a_pin').value
         self.IN1 = self.get_parameter('motor_in1_pin').value
@@ -78,13 +83,13 @@ class MotorController(Node):
         self.ENABLE_B = self.get_parameter('motor_enable_b_pin').value
         self.IN3 = self.get_parameter('motor_in3_pin').value
         self.IN4 = self.get_parameter('motor_in4_pin').value
-        
+
         # Encoder GPIO pins
         self.ENC_A_PIN_A = self.get_parameter('encoder_left_a_pin').value
         self.ENC_A_PIN_B = self.get_parameter('encoder_left_b_pin').value
         self.ENC_B_PIN_A = self.get_parameter('encoder_right_a_pin').value
         self.ENC_B_PIN_B = self.get_parameter('encoder_right_b_pin').value
-        
+
         # Encoder state
         self.ticks_left = 0
         self.ticks_right = 0
@@ -92,33 +97,33 @@ class MotorController(Node):
         self.last_ticks_right = 0
         self.encoder_state_left = 0
         self.encoder_state_right = 0
-        
+
         # Velocity tracking
         self.measured_vel_left = 0.0
         self.measured_vel_right = 0.0
         self.target_vel_left = 0.0
         self.target_vel_right = 0.0
-        
+
         # Current motor duty cycles
         self.current_duty_a = 0.0
         self.current_duty_b = 0.0
-        
+
         # Odometry state
         self.x = 0.0
         self.y = 0.0
         self.theta = 0.0
-        
+
         # Timing
         self.last_time = self.get_clock().now()
         self.last_cmd_time = self.get_clock().now()
-        
+
         # Initialize GPIO
         self.setup_gpio()
-        
+
         # ROS 2 interfaces
         self.cmd_vel_sub = self.create_subscription(
             Twist, 'cmd_vel', self.cmd_vel_callback, 10)
-        
+
         self.odom_pub = self.create_publisher(Odometry, 'odom', 10)
         # Use BEST_EFFORT QoS to match robot_state_publisher's subscription
         joint_state_qos = QoSProfile(
@@ -128,21 +133,21 @@ class MotorController(Node):
         )
         self.joint_state_pub = self.create_publisher(JointState, 'joint_states', joint_state_qos)
         self.tf_broadcaster = TransformBroadcaster(self)
-        
+
         # Timers
         self.control_timer = self.create_timer(0.02, self.control_loop)  # 50 Hz
         self.watchdog_timer = self.create_timer(0.1, self.watchdog_check)
-        
+
         self.get_logger().info('Motor controller initialized')
         self.get_logger().info(f'DG01D-E: 1:48 ratio, {self.ticks_per_rev} ticks/rev')
         self.get_logger().info(f'Wheel base: {self.wheel_base:.3f} m')
         self.get_logger().info(f'Min duty: {self.min_duty}%')
-    
+
     def setup_gpio(self):
-        """Initialize GPIO"""
+        """Initialize GPIO."""
         self.validate_gpio_access()
         GPIO.setmode(GPIO.BCM)
-        
+
         # Motor pins
         GPIO.setup(self.ENABLE_A, GPIO.OUT)
         GPIO.setup(self.IN1, GPIO.OUT)
@@ -150,17 +155,17 @@ class MotorController(Node):
         GPIO.setup(self.ENABLE_B, GPIO.OUT)
         GPIO.setup(self.IN3, GPIO.OUT)
         GPIO.setup(self.IN4, GPIO.OUT)
-        
+
         GPIO.output(self.IN1, GPIO.LOW)
         GPIO.output(self.IN2, GPIO.LOW)
         GPIO.output(self.IN3, GPIO.LOW)
         GPIO.output(self.IN4, GPIO.LOW)
-        
+
         self.pwm_a = GPIO.PWM(self.ENABLE_A, self.pwm_freq)
         self.pwm_b = GPIO.PWM(self.ENABLE_B, self.pwm_freq)
         self.pwm_a.start(0)
         self.pwm_b.start(0)
-        
+
         # Encoder pins
         GPIO.setup(self.ENC_A_PIN_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.ENC_A_PIN_B, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -239,46 +244,46 @@ class MotorController(Node):
         else:
             self.ticks_right += delta
             self.encoder_state_right = new_state
-    
+
     def cmd_vel_callback(self, msg):
-        """Convert Twist to wheel velocities"""
+        """Convert Twist to wheel velocities."""
         self.last_cmd_time = self.get_clock().now()
-        
+
         linear = max(-self.max_speed, min(self.max_speed, msg.linear.x))
         angular = max(-self.max_angular, min(self.max_angular, msg.angular.z))
-        
+
         # Differential drive kinematics
         self.target_vel_left = linear - (angular * self.wheel_base / 2.0)
         self.target_vel_right = linear + (angular * self.wheel_base / 2.0)
-    
+
     def control_loop(self):
-        """Main control loop - open-loop with odometry"""
+        """Run the main control loop with odometry."""
         current_time = self.get_clock().now()
         dt = (current_time - self.last_time).nanoseconds / 1e9
-        
+
         if dt <= 0:
             return
-        
+
         # Calculate measured velocities from encoders
         delta_left = self.ticks_left - self.last_ticks_left
         delta_right = self.ticks_right - self.last_ticks_right
-        
+
         delta_left = self.clamp_tick_delta(delta_left, 'left')
         delta_right = self.clamp_tick_delta(delta_right, 'right')
 
         self.measured_vel_left = (delta_left * self.meters_per_tick) / dt
         self.measured_vel_right = (delta_right * self.meters_per_tick) / dt
-        
+
         # Update odometry
         self.update_odometry(dt)
-        
+
         # Convert target velocities to duty cycles
         duty_left = self.velocity_to_duty(self.target_vel_left)
         duty_right = self.velocity_to_duty(self.target_vel_right)
-        
+
         # Fast ramping for quick response
         max_change = 10.0  # 10% per iteration (was 4%)
-        
+
         # Ramp motor A
         if abs(duty_left - self.current_duty_a) < max_change:
             self.current_duty_a = duty_left
@@ -286,7 +291,7 @@ class MotorController(Node):
             self.current_duty_a += max_change
         else:
             self.current_duty_a -= max_change
-        
+
         # Ramp motor B
         if abs(duty_right - self.current_duty_b) < max_change:
             self.current_duty_b = duty_right
@@ -294,27 +299,27 @@ class MotorController(Node):
             self.current_duty_b += max_change
         else:
             self.current_duty_b -= max_change
-        
+
         # Apply to motors
         self.set_motor_a(self.current_duty_a)
         self.set_motor_b(self.current_duty_b)
-        
+
         # Update state
         self.last_ticks_left = self.ticks_left
         self.last_ticks_right = self.ticks_right
         self.last_time = current_time
-    
+
     def velocity_to_duty(self, velocity):
-        """Map velocity to duty cycle"""
+        """Map velocity to duty cycle."""
         if abs(velocity) < 0.01:
             return 0.0
-        
+
         # Map velocity range to duty range
         velocity_fraction = abs(velocity) / self.max_speed
         duty = self.min_duty + (velocity_fraction * (self.max_duty - self.min_duty))
-        
+
         return duty if velocity >= 0 else -duty
-    
+
     def update_odometry(self, dt):
         """Calculate odometry from encoder-measured velocities."""
         v_left = self.measured_vel_left
@@ -322,28 +327,28 @@ class MotorController(Node):
 
         v_linear = (v_left + v_right) / 2.0
         v_angular = (v_right - v_left) / self.wheel_base
-        
+
         # Euler integration
         delta_theta = v_angular * dt
         delta_x = v_linear * math.cos(self.theta + delta_theta / 2.0) * dt
         delta_y = v_linear * math.sin(self.theta + delta_theta / 2.0) * dt
-        
+
         self.x += delta_x
         self.y += delta_y
         self.theta += delta_theta
-        
+
         # Normalize theta
         self.theta = math.atan2(math.sin(self.theta), math.cos(self.theta))
-        
+
         # Publish
         self.publish_odometry(v_linear, v_angular)
         self.publish_joint_states()
-    
+
     def publish_odometry(self, v_linear, v_angular):
-        """Publish odometry and TF"""
+        """Publish odometry and TF."""
         current_time = self.get_clock().now()
         quat = self.yaw_to_quaternion(self.theta)
-        
+
         # TF: odom -> base_footprint
         t = TransformStamped()
         t.header.stamp = current_time.to_msg()
@@ -353,20 +358,20 @@ class MotorController(Node):
         t.transform.translation.y = self.y
         t.transform.translation.z = 0.0
         t.transform.rotation = quat
-        
+
         self.tf_broadcaster.sendTransform(t)
-        
+
         # Odometry message
         odom = Odometry()
         odom.header.stamp = current_time.to_msg()
         odom.header.frame_id = self.odom_frame
         odom.child_frame_id = self.base_frame
-        
+
         odom.pose.pose.position.x = self.x
         odom.pose.pose.position.y = self.y
         odom.pose.pose.position.z = 0.0
         odom.pose.pose.orientation = quat
-        
+
         odom.twist.twist.linear.x = v_linear
         odom.twist.twist.angular.z = v_angular
 
@@ -415,23 +420,23 @@ class MotorController(Node):
         self.joint_state_pub.publish(js)
 
     def yaw_to_quaternion(self, yaw):
-        """Convert yaw to quaternion"""
+        """Convert yaw to quaternion."""
         quat = Quaternion()
         quat.x = 0.0
         quat.y = 0.0
         quat.z = math.sin(yaw / 2.0)
         quat.w = math.cos(yaw / 2.0)
         return quat
-    
+
     def set_motor_a(self, duty):
-        """Motor A (left) - INVERTED"""
+        """Set motor A (left) duty cycle (inverted)."""
         # Debug logging (throttled to 1 Hz, configurable)
         if self.debug_logging and abs(duty) > 0:
             self.get_logger().info(
                 f'Motor A: {duty:.1f}%',
                 throttle_duration_sec=1.0
             )
-        
+
         if duty > 0:
             GPIO.output(self.IN1, GPIO.LOW)
             GPIO.output(self.IN2, GPIO.HIGH)
@@ -444,16 +449,16 @@ class MotorController(Node):
             GPIO.output(self.IN1, GPIO.LOW)
             GPIO.output(self.IN2, GPIO.LOW)
             self.pwm_a.ChangeDutyCycle(0)
-    
+
     def set_motor_b(self, duty):
-        """Motor B (right) - INVERTED"""
+        """Set motor B (right) duty cycle (inverted)."""
         # Debug logging (throttled to 1 Hz, configurable)
         if self.debug_logging and abs(duty) > 0:
             self.get_logger().info(
                 f'Motor B: {duty:.1f}%',
                 throttle_duration_sec=1.0
             )
-        
+
         if duty > 0:
             GPIO.output(self.IN3, GPIO.LOW)
             GPIO.output(self.IN4, GPIO.HIGH)
@@ -466,17 +471,17 @@ class MotorController(Node):
             GPIO.output(self.IN3, GPIO.LOW)
             GPIO.output(self.IN4, GPIO.LOW)
             self.pwm_b.ChangeDutyCycle(0)
-    
+
     def watchdog_check(self):
-        """Watchdog safety timeout"""
+        """Check watchdog safety timeout."""
         time_since_cmd = (self.get_clock().now() - self.last_cmd_time).nanoseconds / 1e9
-        
+
         if time_since_cmd > 1.0:
             self.target_vel_left = 0.0
             self.target_vel_right = 0.0
-    
+
     def stop_motors(self):
-        """Emergency stop"""
+        """Stop motors immediately."""
         self.get_logger().info('Stopping motors...')
         self.pwm_a.ChangeDutyCycle(0)
         self.pwm_b.ChangeDutyCycle(0)
@@ -484,9 +489,9 @@ class MotorController(Node):
         GPIO.output(self.IN2, GPIO.LOW)
         GPIO.output(self.IN3, GPIO.LOW)
         GPIO.output(self.IN4, GPIO.LOW)
-    
+
     def cleanup(self):
-        """Shutdown cleanup"""
+        """Clean up GPIO on shutdown."""
         self.stop_motors()
         self.pwm_a.stop()
         self.pwm_b.stop()
@@ -495,12 +500,12 @@ class MotorController(Node):
 
     def validate_gpio_access(self):
         """Ensure GPIO device access is available before setup."""
-        gpio_paths = ("/dev/gpiomem", "/dev/mem")
+        gpio_paths = ('/dev/gpiomem', '/dev/mem')
         has_access = any(os.access(path, os.R_OK | os.W_OK) for path in gpio_paths)
         if not has_access:
             msg = (
-                "GPIO access not available. Ensure you are running on a Raspberry Pi "
-                "with permission to access /dev/gpiomem or /dev/mem."
+                'GPIO access not available. Ensure you are running on a Raspberry Pi '
+                'with permission to access /dev/gpiomem or /dev/mem.'
             )
             self.get_logger().error(msg)
             raise RuntimeError(msg)
@@ -521,7 +526,7 @@ class MotorController(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = MotorController()
-    
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
