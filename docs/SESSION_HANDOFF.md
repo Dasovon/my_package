@@ -12,7 +12,7 @@
 
 ### Current Hardware
 - **Motors:** DG01D-E DC gearmotors (1:48 gear ratio) with L298N dual H-bridge driver
-- **Encoders:** Hall effect wheel encoders (576 ticks/rev with quadrature, 288 effective after direction fix)
+- **Encoders:** Hall effect wheel encoders (288 ticks/rev: 3 pulses × 2 edges × 48:1 gear), interrupt-based quadrature decoding
 - **LIDAR:** RPLIDAR A1 (2D laser scanner)
 - **Dimensions:** Wheel base 0.165m, wheel diameter 0.06475m
 
@@ -30,7 +30,7 @@
 2. **Keyboard teleoperation** - WASD control via `teleop_keyboard.py`
 3. **RPLIDAR** - Laser scans publishing correctly (was rotated 180°, now fixed)
 4. **URDF/TF tree** - Robot description and transforms publishing
-5. **Odometry** - Position tracking (using commanded velocity as workaround)
+5. **Odometry** - Encoder-based position tracking with interrupt-driven quadrature decoding
 6. **RViz visualization** - Robot model and laser scan display on dev machine
 
 ---
@@ -49,29 +49,12 @@
 
 ## Known Issues / Limitations
 
-### Encoder Direction Detection (Main Issue)
-The polling-based encoder reading at 500Hz cannot reliably detect wheel direction. When driving backward:
-- Velocity oscillates between positive and negative values
-- This caused odometry to always increase X (robot appeared to only move forward)
+### ~~Encoder Direction Detection~~ (RESOLVED)
+Previously, polling-based encoder reading at 500Hz could not reliably detect wheel direction. This has been replaced with **interrupt-based quadrature decoding** using `GPIO.add_event_detect()` on both encoder channels (A and B pins).
 
-**Current Workaround:** Using commanded velocity (`self.current_linear_velocity`, `self.current_angular_velocity`) for odometry calculation instead of encoder-measured velocity.
+**Implementation:** `motor_controller.py` uses a quadrature state machine (`_quadrature_delta()`) with a lookup table for accurate direction sensing on every edge transition. Encoder inversion is handled via `encoder_left_inverted` (True) and `encoder_right_inverted` (False) parameters.
 
-**Proper Fix Needed:** Implement interrupt-based encoder reading using GPIO edge detection for accurate quadrature decoding and direction detection.
-
-### Affected Code
-File: `my_robot_bringup/motor_controller.py` (lines 358-368)
-
-```python
-# Current workaround - uses commanded velocity
-linear_velocity = self.current_linear_velocity
-angular_velocity = self.current_angular_velocity
-
-# TODO: Replace with interrupt-based encoder reading
-# left_velocity = self.calculate_wheel_velocity('left', current_time)
-# right_velocity = self.calculate_wheel_velocity('right', current_time)
-# linear_velocity = (right_velocity + left_velocity) / 2.0
-# angular_velocity = (right_velocity - left_velocity) / self.wheel_base
-```
+**Debounce:** Configurable via `encoder_bouncetime_ms` parameter (default: 1ms).
 
 ---
 
@@ -90,19 +73,27 @@ angular_velocity = self.current_angular_velocity
 
 ## GPIO Pin Assignments
 
-### Motors (L298N)
-- Enable A (Left PWM): GPIO 17
-- Enable B (Right PWM): GPIO 13
-- IN1 (Left Forward): GPIO 27
-- IN2 (Left Backward): GPIO 22
-- IN3 (Right Forward): GPIO 19
-- IN4 (Right Backward): GPIO 26
+All pins are declared as ROS 2 parameters in `motor_controller.py` and overridden via `config/motor_controller.yaml`. Code defaults use physical pin numbers; YAML provides BCM GPIO numbers used at runtime (`GPIO.setmode(GPIO.BCM)`).
 
-### Encoders
-- Left Encoder A: GPIO 23
-- Left Encoder B: GPIO 24
-- Right Encoder A: GPIO 25
-- Right Encoder B: GPIO 5
+### Motors (L298N)
+- Enable A (Left PWM): BCM 17 / physical pin 11 (`motor_enable_a_pin`)
+- IN1 (Left Direction): BCM 27 / physical pin 13 (`motor_in1_pin`)
+- IN2 (Left Direction): BCM 22 / physical pin 15 (`motor_in2_pin`)
+- Enable B (Right PWM): BCM 13 / physical pin 33 (`motor_enable_b_pin`)
+- IN3 (Right Direction): BCM 19 / physical pin 35 (`motor_in3_pin`)
+- IN4 (Right Direction): BCM 26 / physical pin 37 (`motor_in4_pin`)
+
+### Encoders (interrupt-based quadrature)
+- Left Encoder A: BCM 23 / physical pin 16 (`encoder_left_a_pin`)
+- Left Encoder B: BCM 24 / physical pin 18 (`encoder_left_b_pin`)
+- Right Encoder A: BCM 25 / physical pin 22 (`encoder_right_a_pin`)
+- Right Encoder B: BCM 5 / physical pin 29 (`encoder_right_b_pin`)
+
+### Encoder Configuration
+- `encoder_ticks_per_rev`: 288 (3 pulses × 2 edges × 48:1 gear)
+- `encoder_left_inverted`: True
+- `encoder_right_inverted`: False
+- `encoder_bouncetime_ms`: 1
 
 ---
 
@@ -142,9 +133,8 @@ ros2 run tf2_tools view_frames
 
 ## Next Steps (Priority Order)
 
-1. **Test current fix** - Verify forward/backward movement works correctly in RViz
-2. **Implement interrupt-based encoders** - Use `GPIO.add_event_detect()` for edge-triggered quadrature decoding
-3. **Add IMU (BNO055)** - For better odometry and orientation
+1. ~~**Implement interrupt-based encoders**~~ - DONE: `GPIO.add_event_detect()` quadrature decoding implemented
+2. **Add IMU (BNO055)** - For better odometry and orientation
 4. **SLAM integration** - Map building with LIDAR
 5. **Autonomous navigation** - Nav2 stack
 
@@ -185,5 +175,5 @@ my_package/
 - Package name is `my_robot_bringup` (not `my_package`)
 - Robot workspace on Pi: `~/robot_ws`
 - Dev workspace: `~/dev_ws`
-- The encoder issue is a hardware/timing limitation of polling vs interrupts
-- Current solution prioritizes working visualization over accurate velocity measurement
+- Encoder direction detection now uses interrupt-based quadrature decoding (resolved)
+- Encoder inversion handled via `encoder_left_inverted` / `encoder_right_inverted` parameters

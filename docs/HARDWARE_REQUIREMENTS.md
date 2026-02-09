@@ -62,13 +62,29 @@ rosdep install --from-paths src --ignore-src -r -y
 
 The `motor_controller` node requires direct GPIO access and will only run on Raspberry Pi hardware. It will fail gracefully with an error message on other platforms.
 
-**GPIO Pins Used:**
-- Motor A Enable: GPIO 17
-- Motor A Direction: GPIO 27, GPIO 22
-- Motor A Encoder: GPIO 23, GPIO 24
-- Motor B Enable: GPIO 13
-- Motor B Direction: GPIO 19, GPIO 26
-- Motor B Encoder: GPIO 25, GPIO 5
+**GPIO Pins Used (BCM numbers, configurable via ROS parameters):**
+
+Motor A (Left Wheel):
+- Enable (PWM): BCM 17 / physical pin 11 (`motor_enable_a_pin`)
+- Direction IN1: BCM 27 / physical pin 13 (`motor_in1_pin`)
+- Direction IN2: BCM 22 / physical pin 15 (`motor_in2_pin`)
+- Encoder H1: BCM 23 / physical pin 16 (`encoder_left_a_pin`)
+- Encoder H2: BCM 24 / physical pin 18 (`encoder_left_b_pin`)
+
+Motor B (Right Wheel):
+- Enable (PWM): BCM 13 / physical pin 33 (`motor_enable_b_pin`)
+- Direction IN3: BCM 19 / physical pin 35 (`motor_in3_pin`)
+- Direction IN4: BCM 26 / physical pin 37 (`motor_in4_pin`)
+- Encoder H1: BCM 25 / physical pin 22 (`encoder_right_a_pin`)
+- Encoder H2: BCM 5 / physical pin 29 (`encoder_right_b_pin`)
+
+Encoder configuration:
+- `encoder_ticks_per_rev`: 288 (3 pulses × 2 edges × 48:1 gear ratio)
+- `encoder_left_inverted`: True (compensates for mirrored motor mount)
+- `encoder_right_inverted`: False
+- `encoder_bouncetime_ms`: 1
+
+All pin assignments are declared as ROS 2 parameters in `motor_controller.py` and can be overridden via `config/motor_controller.yaml`.
 
 ## Development Without Hardware
 
