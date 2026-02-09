@@ -19,41 +19,49 @@ This document summarizes the robot's physical characteristics and the current Ra
 - **Wheel circumference:** 0.2034 m
 
 ### Encoders (DG01D-E)
-- **Encoder resolution:** 576 ticks per wheel revolution (12 PPR × 48 gear ratio)
-- **Distance per tick:** 0.353 mm
+- **Encoder resolution:** 288 ticks per wheel revolution (3 pulses × 2 edges × 48:1 gear ratio)
+- **Distance per tick:** 0.706 mm
+- **Decoding method:** Interrupt-based quadrature via `GPIO.add_event_detect()`
 
 ## Raspberry Pi Pin Connections
 
 ### Motor Driver (L298N) Control Pins (BCM GPIO)
 
-These settings use **BCM GPIO numbers** in software (`GPIO.setmode(GPIO.BCM)`), with the physical pin shown for wiring reference.
+All pins are declared as ROS 2 parameters in `motor_controller.py` (with physical pin defaults) and overridden via `config/motor_controller.yaml` with BCM GPIO numbers. The code uses `GPIO.setmode(GPIO.BCM)`.
 
 **Motor A (Left Wheel):**
-- Enable (PWM): GPIO 17 — Physical pin 11 → L298N ENA
-- Direction 1: GPIO 27 — Physical pin 13 → L298N IN1
-- Direction 2: GPIO 22 — Physical pin 15 → L298N IN2
+- Enable (PWM): BCM 17 — Physical pin 11 → L298N ENA (`motor_enable_a_pin`)
+- Direction 1: BCM 27 — Physical pin 13 → L298N IN1 (`motor_in1_pin`)
+- Direction 2: BCM 22 — Physical pin 15 → L298N IN2 (`motor_in2_pin`)
 
 **Motor B (Right Wheel):**
-- Enable (PWM): GPIO 13 — Physical pin 33 → L298N ENB
-- Direction 1: GPIO 19 — Physical pin 35 → L298N IN3
-- Direction 2: GPIO 26 — Physical pin 37 → L298N IN4
+- Enable (PWM): BCM 13 — Physical pin 33 → L298N ENB (`motor_enable_b_pin`)
+- Direction 1: BCM 19 — Physical pin 35 → L298N IN3 (`motor_in3_pin`)
+- Direction 2: BCM 26 — Physical pin 37 → L298N IN4 (`motor_in4_pin`)
 
-### Encoder Inputs (Quadrature)
+### Encoder Inputs (Interrupt-based Quadrature)
 
-These settings use **BCM GPIO numbers** in software (`GPIO.setmode(GPIO.BCM)`), with the physical pin shown for wiring reference.
+Encoders use `GPIO.add_event_detect()` on both channels for accurate quadrature decoding with a state machine lookup table.
 
 **Motor A (Left Wheel):**
-- Encoder H1: GPIO 23 — Physical pin 16
-- Encoder H2: GPIO 24 — Physical pin 18
+- Encoder H1: BCM 23 — Physical pin 16 (`encoder_left_a_pin`)
+- Encoder H2: BCM 24 — Physical pin 18 (`encoder_left_b_pin`)
 
 **Motor B (Right Wheel):**
-- Encoder H1: GPIO 25 — Physical pin 22
-- Encoder H2: GPIO 5 — Physical pin 29
+- Encoder H1: BCM 25 — Physical pin 22 (`encoder_right_a_pin`)
+- Encoder H2: BCM 5 — Physical pin 29 (`encoder_right_b_pin`)
+
+### Encoder Configuration
+- `encoder_ticks_per_rev`: 288 (3 pulses × 2 edges × 48:1 gear ratio)
+- `encoder_left_inverted`: True (compensates for mirrored left motor mount)
+- `encoder_right_inverted`: False
+- `encoder_bouncetime_ms`: 1
 
 ### Encoder Power
 - **+5V:** Physical pins 2 or 4
 - **GND:** Physical pins 6 or 9
 
 ## Notes
-- The GPIO mapping above reflects the working test configuration for the L298N motor driver and DG01D-E encoders.
-- Physical motors are wired opposite each other; software inversion is used for correct forward motion.
+- The GPIO mapping above reflects the working configuration for the L298N motor driver and DG01D-E encoders.
+- Physical motors are wired opposite each other; the left motor direction is inverted in software (`set_motor_a()`) and the left encoder is inverted via `encoder_left_inverted: True`.
+- All pin assignments can be reconfigured via ROS 2 parameters without code changes.

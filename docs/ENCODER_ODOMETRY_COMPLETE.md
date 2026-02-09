@@ -10,9 +10,9 @@
 
 ### Hardware Integration
 - ✅ Connected DG01D-E Hall effect encoders to Raspberry Pi GPIO
-- ✅ Quadrature decoding (H1/H2 channels) for direction sensing
-- ✅ Motor direction calibrated (both inverted for differential drive)
-- ✅ Verified 576 ticks/rev (12 PPR × 48 gear ratio)
+- ✅ Interrupt-based quadrature decoding (H1/H2 channels) via `GPIO.add_event_detect()`
+- ✅ Motor direction calibrated (`encoder_left_inverted: True`, `encoder_right_inverted: False`)
+- ✅ 288 ticks/rev (3 pulses × 2 edges × 48:1 gear ratio)
 
 ### Software Implementation
 - ✅ Open-loop velocity control (min duty 80% for reliable starting)
@@ -37,8 +37,8 @@
 Wheel base: 165mm (0.165 m)
 Wheel diameter: 64.75mm (0.06475 m)
 Wheel circumference: 203.4mm
-Distance per encoder tick: 0.353mm
-Encoder resolution: 576 ticks per wheel revolution
+Distance per encoder tick: 0.706mm
+Encoder resolution: 288 ticks per wheel revolution (3 pulses × 2 edges × 48:1)
 Gear ratio: 1:48
 Motor voltage: 6-9V (currently ~7V with L298N losses)
 ```
@@ -55,19 +55,26 @@ ramp_rate: 10% per iteration (50 Hz control loop)
 
 ### GPIO Pin Mapping
 
+All pins are configurable via ROS 2 parameters (declared in `motor_controller.py`, overridden in `config/motor_controller.yaml`).
+
 **Motor A (Left Wheel):**
-- Enable: GPIO 17 (physical pin 11)
-- IN1: GPIO 27 (physical pin 13)
-- IN2: GPIO 22 (physical pin 15)
-- Encoder H1: GPIO 23 (physical pin 16)
-- Encoder H2: GPIO 24 (physical pin 18)
+- Enable: BCM 17 / physical pin 11 (`motor_enable_a_pin`)
+- IN1: BCM 27 / physical pin 13 (`motor_in1_pin`)
+- IN2: BCM 22 / physical pin 15 (`motor_in2_pin`)
+- Encoder H1: BCM 23 / physical pin 16 (`encoder_left_a_pin`)
+- Encoder H2: BCM 24 / physical pin 18 (`encoder_left_b_pin`)
 
 **Motor B (Right Wheel):**
-- Enable: GPIO 13 (physical pin 33)
-- IN3: GPIO 19 (physical pin 35)
-- IN4: GPIO 26 (physical pin 37)
-- Encoder H1: GPIO 25 (physical pin 22)
-- Encoder H2: GPIO 5 (physical pin 29)
+- Enable: BCM 13 / physical pin 33 (`motor_enable_b_pin`)
+- IN3: BCM 19 / physical pin 35 (`motor_in3_pin`)
+- IN4: BCM 26 / physical pin 37 (`motor_in4_pin`)
+- Encoder H1: BCM 25 / physical pin 22 (`encoder_right_a_pin`)
+- Encoder H2: BCM 5 / physical pin 29 (`encoder_right_b_pin`)
+
+**Encoder Configuration:**
+- `encoder_left_inverted`: True (compensates for mirrored left motor mount)
+- `encoder_right_inverted`: False
+- `encoder_bouncetime_ms`: 1 (GPIO edge detection debounce)
 
 **Encoder Power:**
 - +5V: Physical pins 2 or 4
@@ -80,8 +87,8 @@ ramp_rate: 10% per iteration (50 Hz control loop)
 ### Why 80% Minimum Duty?
 DG01D-E motors have high static friction. Below 60% duty, motors won't overcome breakaway torque. At 80%, reliable starting on every command.
 
-### Why Both Motors Inverted?
-Physical motors wired opposite to each other on chassis. Software inversion (swapping IN1/IN2 and IN3/IN4 logic) compensates without rewiring hardware.
+### Encoder Inversion
+Physical motors are wired opposite to each other on chassis. The left encoder is inverted in software (`encoder_left_inverted: True`) while the right encoder reads normally (`encoder_right_inverted: False`). Motor A direction is also compensated in code (`set_motor_a()` has reversed GPIO logic).
 
 ### Open-Loop vs Closed-Loop
 **Current:** Open-loop control (no PID feedback)
@@ -157,7 +164,7 @@ ros2 run tf2_ros tf2_echo odom base_footprint
 # config/motor_controller.yaml
 wheel_base: 0.165
 wheel_diameter: 0.06475
-encoder_ticks_per_rev: 576
+encoder_ticks_per_rev: 288
 min_duty_cycle: 80
 ```
 
@@ -251,7 +258,7 @@ min_duty_cycle: 80
 - motor_controller CPU: ~10-15%
 - Memory: ~40 MB
 - Control loop: 50 Hz stable
-- Encoder reading: 100 Hz stable
+- Encoder reading: interrupt-based (GPIO edge detection)
 
 ---
 

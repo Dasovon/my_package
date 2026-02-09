@@ -34,21 +34,41 @@ Temporary motor control setup using L298N dual H-bridge driver to test ROS 2 dif
 
 ## Pin Mapping (BCM GPIO Numbering)
 
+All pins are declared as ROS 2 parameters in `motor_controller.py` and can be overridden via `config/motor_controller.yaml`. The code defaults use physical pin numbers; the YAML config provides BCM GPIO numbers used at runtime (`GPIO.setmode(GPIO.BCM)`).
+
 ### Motor A (Left Wheel)
 
-| Function | Pi Physical Pin | BCM GPIO | L298N Terminal |
-|----------|----------------|----------|----------------|
-| Enable (PWM) | 11 | GPIO 17 | ENA |
-| Direction 1 | 13 | GPIO 27 | IN1 |
-| Direction 2 | 15 | GPIO 22 | IN2 |
+| Function | Pi Physical Pin | BCM GPIO | ROS Parameter | L298N Terminal |
+|----------|----------------|----------|---------------|----------------|
+| Enable (PWM) | 11 | GPIO 17 | `motor_enable_a_pin` | ENA |
+| Direction 1 | 13 | GPIO 27 | `motor_in1_pin` | IN1 |
+| Direction 2 | 15 | GPIO 22 | `motor_in2_pin` | IN2 |
 
 ### Motor B (Right Wheel)
 
-| Function | Pi Physical Pin | BCM GPIO | L298N Terminal |
-|----------|----------------|----------|----------------|
-| Enable (PWM) | 33 | GPIO 13 | ENB |
-| Direction 1 | 35 | GPIO 19 | IN3 |
-| Direction 2 | 37 | GPIO 26 | IN4 |
+| Function | Pi Physical Pin | BCM GPIO | ROS Parameter | L298N Terminal |
+|----------|----------------|----------|---------------|----------------|
+| Enable (PWM) | 33 | GPIO 13 | `motor_enable_b_pin` | ENB |
+| Direction 1 | 35 | GPIO 19 | `motor_in3_pin` | IN3 |
+| Direction 2 | 37 | GPIO 26 | `motor_in4_pin` | IN4 |
+
+### Encoder Inputs (Quadrature, interrupt-based)
+
+| Function | Pi Physical Pin | BCM GPIO | ROS Parameter |
+|----------|----------------|----------|---------------|
+| Left Encoder H1 | 16 | GPIO 23 | `encoder_left_a_pin` |
+| Left Encoder H2 | 18 | GPIO 24 | `encoder_left_b_pin` |
+| Right Encoder H1 | 22 | GPIO 25 | `encoder_right_a_pin` |
+| Right Encoder H2 | 29 | GPIO 5 | `encoder_right_b_pin` |
+
+### Encoder Configuration Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `encoder_ticks_per_rev` | 288 | 3 pulses × 2 edges × 48:1 gear ratio |
+| `encoder_left_inverted` | True | Compensates for mirrored motor mount |
+| `encoder_right_inverted` | False | Normal direction |
+| `encoder_bouncetime_ms` | 1 | GPIO edge detection debounce (ms) |
 
 ---
 
@@ -123,12 +143,19 @@ Temporary motor control setup using L298N dual H-bridge driver to test ROS 2 dif
 ```yaml
 motor_controller:
   ros__parameters:
-    wheel_base: 0.165        # Distance between wheels (m)
-    wheel_diameter: 0.06475  # Wheel diameter (m)
-    max_speed: 0.5           # Maximum linear velocity (m/s)
-    min_duty_cycle: 80       # Minimum PWM for starting
-    max_duty_cycle: 100      # Maximum PWM
-    pwm_frequency: 1000      # PWM frequency (Hz)
+    wheel_base: 0.165              # Distance between wheels (m)
+    wheel_diameter: 0.06475        # Wheel diameter (m)
+    encoder_ticks_per_rev: 288     # 3 pulses × 2 edges × 48:1 gear
+    max_speed: 0.5                 # Maximum linear velocity (m/s)
+    max_angular_speed: 2.0         # Maximum angular velocity (rad/s)
+    min_duty_cycle: 80             # Minimum PWM for starting
+    max_duty_cycle: 100            # Maximum PWM
+    pwm_frequency: 1000            # PWM frequency (Hz)
+    max_tick_delta: 1200           # Encoder tick delta clamp
+    encoder_left_inverted: true    # Left encoder direction inversion
+    encoder_right_inverted: false  # Right encoder direction
+    encoder_bouncetime_ms: 1       # Edge detection debounce (ms)
+    enable_debug_logging: false    # Motor duty cycle debug output
 ```
 
 **Safety Features:**
@@ -244,8 +271,8 @@ install(PROGRAMS
 
 ### Issue 1: ~~No Wheel Encoders~~ (RESOLVED)
 
-**Status:** Hall effect encoders now integrated (576 ticks/rev)
-**Implementation:** Quadrature encoder reading at 100 Hz
+**Status:** Hall effect encoders now integrated (288 ticks/rev, 3 pulses × 2 edges × 48:1 gear)
+**Implementation:** Interrupt-based quadrature decoding via `GPIO.add_event_detect()` on both channels
 **Output:** Odometry published to `/odom` topic with TF transforms
 
 ### Issue 2: L298N Voltage Drop
@@ -392,7 +419,7 @@ v_right = linear.x + (angular.z * wheel_base / 2.0)
 - Keyboard teleoperation
 - Differential drive kinematics
 - Safety features (watchdog, emergency stop)
-- Hall effect encoder feedback (576 ticks/rev)
+- Hall effect encoder feedback (288 ticks/rev, interrupt-based quadrature)
 - Odometry publishing (`/odom` topic + TF)
 - Encoder tick clamping (noise rejection)
 
