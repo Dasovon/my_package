@@ -1,21 +1,11 @@
 #!/usr/bin/env python3
-"""
-Unit tests for motor_controller.py
-
-Tests the mathematical functions used in the motor controller:
-- velocity_to_duty: Maps velocity to PWM duty cycle
-- clamp_tick_delta: Limits encoder tick deltas
-- yaw_to_quaternion: Converts yaw angle to quaternion
-- Differential drive kinematics
-- Odometry calculations
-"""
+# Copyright (c) 2026 Ryan
+# SPDX-License-Identifier: MIT
+"""Unit tests for motor_controller.py."""
 
 import math
 
-try:
-    import pytest
-except ImportError:
-    pytest = None
+import pytest
 
 
 # ============================================================================
@@ -23,17 +13,7 @@ except ImportError:
 # ============================================================================
 
 def velocity_to_duty(velocity, max_speed, min_duty, max_duty):
-    """Map velocity to duty cycle.
-
-    Args:
-        velocity: Target velocity in m/s (can be negative)
-        max_speed: Maximum speed in m/s
-        min_duty: Minimum duty cycle percentage (motor startup threshold)
-        max_duty: Maximum duty cycle percentage
-
-    Returns:
-        Duty cycle percentage (negative for reverse direction)
-    """
+    """Map velocity to duty cycle."""
     if abs(velocity) < 0.01:
         return 0.0
 
@@ -44,29 +24,14 @@ def velocity_to_duty(velocity, max_speed, min_duty, max_duty):
 
 
 def clamp_tick_delta(delta, max_tick_delta):
-    """Clamp encoder tick delta to avoid extreme spikes.
-
-    Args:
-        delta: Raw encoder tick delta
-        max_tick_delta: Maximum allowed delta magnitude
-
-    Returns:
-        Clamped delta value
-    """
+    """Clamp encoder tick delta to avoid extreme spikes."""
     if abs(delta) > max_tick_delta:
         return max_tick_delta if delta > 0 else -max_tick_delta
     return delta
 
 
 def yaw_to_quaternion(yaw):
-    """Convert yaw angle to quaternion (x, y, z, w).
-
-    Args:
-        yaw: Yaw angle in radians
-
-    Returns:
-        Tuple (x, y, z, w) quaternion components
-    """
+    """Convert yaw angle to quaternion (x, y, z, w)."""
     x = 0.0
     y = 0.0
     z = math.sin(yaw / 2.0)
@@ -75,49 +40,21 @@ def yaw_to_quaternion(yaw):
 
 
 def differential_drive_kinematics(linear, angular, wheel_base):
-    """Convert linear/angular velocity to wheel velocities.
-
-    Args:
-        linear: Linear velocity in m/s
-        angular: Angular velocity in rad/s
-        wheel_base: Distance between wheels in meters
-
-    Returns:
-        Tuple (vel_left, vel_right) wheel velocities in m/s
-    """
+    """Convert linear/angular velocity to wheel velocities."""
     vel_left = linear - (angular * wheel_base / 2.0)
     vel_right = linear + (angular * wheel_base / 2.0)
     return (vel_left, vel_right)
 
 
 def inverse_kinematics(vel_left, vel_right, wheel_base):
-    """Convert wheel velocities to linear/angular velocity.
-
-    Args:
-        vel_left: Left wheel velocity in m/s
-        vel_right: Right wheel velocity in m/s
-        wheel_base: Distance between wheels in meters
-
-    Returns:
-        Tuple (v_linear, v_angular)
-    """
+    """Convert wheel velocities to linear/angular velocity."""
     v_linear = (vel_left + vel_right) / 2.0
     v_angular = (vel_right - vel_left) / wheel_base
     return (v_linear, v_angular)
 
 
 def update_odometry(x, y, theta, v_linear, v_angular, dt):
-    """Update odometry using Euler integration.
-
-    Args:
-        x, y, theta: Current pose
-        v_linear: Linear velocity in m/s
-        v_angular: Angular velocity in rad/s
-        dt: Time delta in seconds
-
-    Returns:
-        Tuple (new_x, new_y, new_theta)
-    """
+    """Update odometry using Euler integration."""
     delta_theta = v_angular * dt
     delta_x = v_linear * math.cos(theta + delta_theta / 2.0) * dt
     delta_y = v_linear * math.sin(theta + delta_theta / 2.0) * dt
@@ -133,16 +70,7 @@ def update_odometry(x, y, theta, v_linear, v_angular, dt):
 
 
 def encoder_ticks_to_distance(ticks, ticks_per_rev, wheel_diameter):
-    """Convert encoder ticks to distance traveled.
-
-    Args:
-        ticks: Number of encoder ticks
-        ticks_per_rev: Encoder ticks per wheel revolution
-        wheel_diameter: Wheel diameter in meters
-
-    Returns:
-        Distance in meters
-    """
+    """Convert encoder ticks to distance traveled."""
     wheel_circumference = math.pi * wheel_diameter
     meters_per_tick = wheel_circumference / ticks_per_rev
     return ticks * meters_per_tick
@@ -224,7 +152,10 @@ class TestClampTickDelta:
 
     def test_slightly_over_clamped(self):
         """Delta slightly over max should be clamped."""
-        assert clamp_tick_delta(self.MAX_TICK_DELTA + 1, self.MAX_TICK_DELTA) == self.MAX_TICK_DELTA
+        assert (
+            clamp_tick_delta(self.MAX_TICK_DELTA + 1, self.MAX_TICK_DELTA)
+            == self.MAX_TICK_DELTA
+        )
 
 
 class TestYawToQuaternion:
@@ -309,7 +240,11 @@ class TestDifferentialDriveKinematics:
         linear_in = 0.3
         angular_in = 0.5
 
-        vel_left, vel_right = differential_drive_kinematics(linear_in, angular_in, self.WHEEL_BASE)
+        vel_left, vel_right = differential_drive_kinematics(
+            linear_in,
+            angular_in,
+            self.WHEEL_BASE,
+        )
         linear_out, angular_out = inverse_kinematics(vel_left, vel_right, self.WHEEL_BASE)
 
         assert abs(linear_in - linear_out) < 1e-10
@@ -335,7 +270,7 @@ class TestOdometryUpdate:
 
     def test_forward_motion_at_90_degrees(self):
         """Forward motion at 90 degrees increases y only."""
-        x, y, theta = update_odometry(0.0, 0.0, math.pi/2, 1.0, 0.0, 1.0)
+        x, y, theta = update_odometry(0.0, 0.0, math.pi / 2, 1.0, 0.0, 1.0)
         assert abs(x) < 1e-10
         assert abs(y - 1.0) < 1e-10
 
@@ -376,19 +311,31 @@ class TestEncoderConversion:
 
     def test_one_revolution(self):
         """One revolution should equal wheel circumference."""
-        dist = encoder_ticks_to_distance(self.TICKS_PER_REV, self.TICKS_PER_REV, self.WHEEL_DIAMETER)
+        dist = encoder_ticks_to_distance(
+            self.TICKS_PER_REV,
+            self.TICKS_PER_REV,
+            self.WHEEL_DIAMETER,
+        )
         expected = math.pi * self.WHEEL_DIAMETER
         assert abs(dist - expected) < 1e-10
 
     def test_negative_ticks(self):
         """Negative ticks should give negative distance."""
-        dist = encoder_ticks_to_distance(-self.TICKS_PER_REV, self.TICKS_PER_REV, self.WHEEL_DIAMETER)
+        dist = encoder_ticks_to_distance(
+            -self.TICKS_PER_REV,
+            self.TICKS_PER_REV,
+            self.WHEEL_DIAMETER,
+        )
         expected = -math.pi * self.WHEEL_DIAMETER
         assert abs(dist - expected) < 1e-10
 
     def test_partial_revolution(self):
         """Half revolution should give half circumference."""
-        dist = encoder_ticks_to_distance(self.TICKS_PER_REV // 2, self.TICKS_PER_REV, self.WHEEL_DIAMETER)
+        dist = encoder_ticks_to_distance(
+            self.TICKS_PER_REV // 2,
+            self.TICKS_PER_REV,
+            self.WHEEL_DIAMETER,
+        )
         expected = math.pi * self.WHEEL_DIAMETER / 2
         assert abs(dist - expected) < 1e-6
 

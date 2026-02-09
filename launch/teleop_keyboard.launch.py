@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Ryan
+# SPDX-License-Identifier: MIT
 
 from launch import LaunchDescription
-from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
 
 def generate_launch_description():
-
     # Declare launch arguments
     linear_speed_arg = DeclareLaunchArgument(
         'linear_speed',
         default_value='0.2',
-        description='Linear speed in m/s'
+        description='Linear speed in m/s',
     )
 
     angular_speed_arg = DeclareLaunchArgument(
         'angular_speed',
         default_value='0.5',
-        description='Angular speed in rad/s'
+        description='Angular speed in rad/s',
     )
 
     return LaunchDescription([

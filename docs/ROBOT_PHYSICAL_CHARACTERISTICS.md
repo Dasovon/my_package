@@ -26,6 +26,8 @@ This document summarizes the robot's physical characteristics and the current Ra
 
 ### Motor Driver (L298N) Control Pins (BCM GPIO)
 
+These settings use **BCM GPIO numbers** in software (`GPIO.setmode(GPIO.BCM)`), with the physical pin shown for wiring reference.
+
 **Motor A (Left Wheel):**
 - Enable (PWM): GPIO 17 — Physical pin 11 → L298N ENA
 - Direction 1: GPIO 27 — Physical pin 13 → L298N IN1
@@ -37,6 +39,8 @@ This document summarizes the robot's physical characteristics and the current Ra
 - Direction 2: GPIO 26 — Physical pin 37 → L298N IN4
 
 ### Encoder Inputs (Quadrature)
+
+These settings use **BCM GPIO numbers** in software (`GPIO.setmode(GPIO.BCM)`), with the physical pin shown for wiring reference.
 
 **Motor A (Left Wheel):**
 - Encoder H1: GPIO 23 — Physical pin 16
