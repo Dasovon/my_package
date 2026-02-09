@@ -128,6 +128,10 @@ If the motor controller exits with GPIO warnings or `RuntimeError: Failed to add
 sudo reboot
 ```
 
+If you see the launch error `process has died ... motor_controller.py` with exit code 1, scroll up in the same terminal for the real cause (often a GPIO edge-detect failure). Resolve that root error and relaunch.
+
+If the error repeats, confirm only one motor controller is running (`ros2 node list`) before relaunching.
+
 This starts:
 
 1. **Robot State Publisher** (URDF + TF)
