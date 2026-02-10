@@ -168,11 +168,13 @@
 ## 🐛 Known Issues
 
 ### To Fix
-- [ ] None currently
+- [ ] Remove duplicate cmd_vel publishing in teleop (timer + immediate on keypress)
+- [ ] Calculate accurate URDF inertia values (currently using placeholders)
 
 ### To Investigate
 - [ ] WiFi power management on Pi (potential disconnects)
 - [ ] USB power budget with all sensors connected
+- [ ] Add ROS 2 integration tests (node communication, topic verification)
 
 ---
 
