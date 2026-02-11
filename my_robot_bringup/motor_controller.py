@@ -17,7 +17,6 @@ import RPi.GPIO as GPIO
 from geometry_msgs.msg import Quaternion, TransformStamped, Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
 from tf2_ros import TransformBroadcaster
 
@@ -125,13 +124,7 @@ class MotorController(Node):
             Twist, 'cmd_vel', self.cmd_vel_callback, 10)
 
         self.odom_pub = self.create_publisher(Odometry, 'odom', 10)
-        # Use BEST_EFFORT QoS to match robot_state_publisher's subscription
-        joint_state_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=10
-        )
-        self.joint_state_pub = self.create_publisher(JointState, 'joint_states', joint_state_qos)
+        self.joint_state_pub = self.create_publisher(JointState, 'joint_states', 10)
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # Timers
