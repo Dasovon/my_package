@@ -146,6 +146,7 @@ class MotorController(Node):
     def setup_gpio(self):
         """Initialize GPIO."""
         self.validate_gpio_access()
+        GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
 
         # Motor pins
@@ -182,23 +183,39 @@ class MotorController(Node):
 
     def _setup_encoder_events(self):
         """Configure GPIO edge callbacks for encoders."""
-        self._add_encoder_event(self.ENC_A_PIN_A, self._left_encoder_callback)
-        self._add_encoder_event(self.ENC_A_PIN_B, self._left_encoder_callback)
-        self._add_encoder_event(self.ENC_B_PIN_A, self._right_encoder_callback)
-        self._add_encoder_event(self.ENC_B_PIN_B, self._right_encoder_callback)
+        pins = [
+            (self.ENC_A_PIN_A, self._left_encoder_callback),
+            (self.ENC_A_PIN_B, self._left_encoder_callback),
+            (self.ENC_B_PIN_A, self._right_encoder_callback),
+            (self.ENC_B_PIN_B, self._right_encoder_callback),
+        ]
+        failed = 0
+        for pin, cb in pins:
+            if not self._add_encoder_event(pin, cb):
+                failed += 1
+        if failed > 0:
+            self.get_logger().warn(
+                f'{failed}/4 encoder interrupts failed. '
+                'Odometry will be unavailable. '
+                'Try: sudo pkill -f motor_controller; sudo GPIO.cleanup()'
+            )
 
     def _add_encoder_event(self, pin, callback):
+        """Register a single GPIO edge-detect callback."""
         bouncetime = self.encoder_bouncetime_ms if self.encoder_bouncetime_ms > 0 else None
         try:
             if bouncetime is None:
                 GPIO.add_event_detect(pin, GPIO.BOTH, callback=callback)
             else:
-                GPIO.add_event_detect(pin, GPIO.BOTH, callback=callback, bouncetime=bouncetime)
+                GPIO.add_event_detect(
+                    pin, GPIO.BOTH, callback=callback, bouncetime=bouncetime
+                )
+            return True
         except RuntimeError as exc:
             self.get_logger().error(
                 f'Failed to add GPIO event detect for pin {pin}: {exc}'
             )
-            raise
+            return False
 
     def _quadrature_delta(self, last_state, new_state):
         """Compute delta ticks from quadrature state transition."""
