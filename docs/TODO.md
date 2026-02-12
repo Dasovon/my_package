@@ -90,16 +90,20 @@
 - [x] Launch SLAM alongside full_bringup
 - [x] Visualize map building in rviz2 from dev machine
 - [ ] **Fix map drift/quality** -- map is unstable during driving
-  - Current theory: 288 ticks/rev encoder resolution is too low for
-    reliable odometry (articubot_one uses 3436 ticks/rev)
-  - SLAM params tuned conservatively (matching articubot_one) but
-    odometry prior is still too noisy for good scan matching
-  - Possible fixes to investigate:
-    - [ ] Upgrade to higher-resolution encoders
-    - [ ] Add IMU for heading correction (BNO055)
-    - [ ] Try sync mode instead of async
+  - Root cause: 288 ticks/rev encoder resolution is too low for
+    reliable odometry (articubot_one uses 3436 ticks/rev = 12x more)
+  - Heading drift measured at ~10 deg over 600mm straight-line travel
+  - SLAM params tuned conservatively (matching articubot_one) across
+    multiple sessions -- param tuning alone is insufficient
+  - correlation_search_space_dimension > 0.5 crashes Pi (out of memory)
+  - **Next steps to try (priority order):**
     - [ ] Tune wheel_base via rotation calibration (spin 360 deg in place)
-    - [ ] Test with robot_localization EKF if IMU added
+          -- free, heading error is likely the biggest contributor
+    - [ ] Add BNO055 IMU for heading correction (I2C/UART)
+          -- would dramatically improve odometry quality for SLAM
+    - [ ] Test with robot_localization EKF once IMU added
+    - [ ] Try sync mode instead of async
+    - [ ] Upgrade to higher-resolution encoders (last resort, hardware change)
 - [ ] Save and load maps
 - [ ] Map a full room successfully
 
@@ -145,10 +149,12 @@
 - [ ] Remove duplicate cmd_vel publishing in teleop (timer + immediate)
 - [ ] Calculate accurate URDF inertia values (using placeholders)
 
+### Resolved
+- [x] ROS_DOMAIN_ID -- both machines using default 0, cross-machine comms working
+
 ### To Investigate
 - [ ] WiFi power management on Pi (potential disconnects)
 - [ ] Motor controller CPU usage ~33% (consider C++ port if needed)
-- [ ] ROS_DOMAIN_ID not set in robot bashrc (currently default 0)
 
 ---
 
