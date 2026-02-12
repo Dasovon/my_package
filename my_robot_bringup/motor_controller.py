@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Ryan
-# SPDX-License-Identifier: MIT
-"""Differential drive motor controller with hall effect encoders.
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT.
+"""
+Differential drive motor controller with hall effect encoders.
 
 - DG01D-E motors (1:48 gear ratio, 576 ticks/rev)
 - L298N dual H-bridge driver
@@ -30,8 +34,8 @@ class MotorController(Node):
 
         # Declare parameters
         self.declare_parameter('wheel_base', 0.165)
-        self.declare_parameter('wheel_diameter', 0.06475)
-        self.declare_parameter('encoder_ticks_per_rev', 288)  # 3 pulses * 2 edges * 48:1 gear
+        self.declare_parameter('wheel_diameter', 0.065)
+        self.declare_parameter('encoder_ticks_per_rev', 288)  # 3 magnets * 2 edges * 48:1 gear
         self.declare_parameter('max_speed', 0.5)
         self.declare_parameter('max_angular_speed', 2.0)
         self.declare_parameter('min_duty_cycle', 80)  # Increased from 60
@@ -40,19 +44,19 @@ class MotorController(Node):
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'base_footprint')
         self.declare_parameter('max_tick_delta', 1200)
-        self.declare_parameter('motor_enable_a_pin', 11)
-        self.declare_parameter('motor_in1_pin', 13)
-        self.declare_parameter('motor_in2_pin', 15)
-        self.declare_parameter('motor_enable_b_pin', 33)
-        self.declare_parameter('motor_in3_pin', 35)
-        self.declare_parameter('motor_in4_pin', 37)
-        self.declare_parameter('encoder_left_a_pin', 16)
-        self.declare_parameter('encoder_left_b_pin', 18)
-        self.declare_parameter('encoder_right_a_pin', 22)
-        self.declare_parameter('encoder_right_b_pin', 29)
+        self.declare_parameter('motor_enable_a_pin', 17)
+        self.declare_parameter('motor_in1_pin', 27)
+        self.declare_parameter('motor_in2_pin', 22)
+        self.declare_parameter('motor_enable_b_pin', 13)
+        self.declare_parameter('motor_in3_pin', 19)
+        self.declare_parameter('motor_in4_pin', 26)
+        self.declare_parameter('encoder_left_a_pin', 23)
+        self.declare_parameter('encoder_left_b_pin', 24)
+        self.declare_parameter('encoder_right_a_pin', 25)
+        self.declare_parameter('encoder_right_b_pin', 5)
         self.declare_parameter('encoder_left_inverted', True)
         self.declare_parameter('encoder_right_inverted', False)
-        self.declare_parameter('encoder_bouncetime_ms', 1)
+        self.declare_parameter('encoder_bouncetime_ms', 0)
         self.declare_parameter('enable_debug_logging', False)
 
         # Get parameters

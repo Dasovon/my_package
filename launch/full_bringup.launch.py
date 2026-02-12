@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Ryan
-# SPDX-License-Identifier: MIT
-"""Full robot bringup launch file.
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT.
+"""
+Full robot bringup launch file.
 
 Launches all core robot nodes:
 - Robot State Publisher (URDF/TF)

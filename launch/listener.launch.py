@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Ryan
-# SPDX-License-Identifier: MIT
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT.
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
