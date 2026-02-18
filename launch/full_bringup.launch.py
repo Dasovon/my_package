@@ -57,7 +57,7 @@ def generate_launch_description():
                 os.path.join(pkg_dir, 'launch', 'motor_control.launch.py'),
             ),
             launch_arguments={
-                'publish_odom_tf': 'false',
+                'publish_odom_tf': 'true',
             }.items(),
         ),
 

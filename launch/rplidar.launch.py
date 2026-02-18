@@ -28,5 +28,7 @@ def generate_launch_description():
             name='rplidar_node',
             parameters=[config],
             output='screen',
+            respawn=True,
+            respawn_delay=3.0,
         ),
     ])
