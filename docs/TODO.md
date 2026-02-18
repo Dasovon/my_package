@@ -1,6 +1,6 @@
 # Project Roadmap and TODO List
 
-**Last Updated:** February 11, 2026
+**Last Updated:** February 12, 2026
 
 ---
 
@@ -66,6 +66,7 @@
 ### Calibration (COMPLETE)
 - [x] Calibrate encoder_ticks_per_rev (288 ticks/rev)
 - [x] Calibrate wheel_diameter (65mm)
+- [x] Calibrate wheel_base via rotation test (0.165m physical -> 0.236m effective, +0.08% heading error)
 - [x] Set BCM pin defaults to match hardware
 - [x] Disable encoder bouncetime (hall effect sensors don't need it)
 
@@ -97,8 +98,7 @@
     multiple sessions -- param tuning alone is insufficient
   - correlation_search_space_dimension > 0.5 crashes Pi (out of memory)
   - **Next steps to try (priority order):**
-    - [ ] Tune wheel_base via rotation calibration (spin 360 deg in place)
-          -- free, heading error is likely the biggest contributor
+    - [x] Tune wheel_base via rotation calibration (0.165m -> 0.236m, heading error now <1%)
     - [ ] Add BNO055 IMU for heading correction (I2C/UART)
           -- would dramatically improve odometry quality for SLAM
     - [ ] Test with robot_localization EKF once IMU added
@@ -145,7 +145,7 @@
 
 ### To Fix
 - [ ] Map drift during SLAM (encoder resolution limiting factor)
-- [ ] Heading drift ~10 deg over 600mm straight-line travel
+- [x] ~~Heading drift ~10 deg over 600mm straight-line travel~~ -- fixed via wheel_base calibration (0.236m)
 - [ ] Remove duplicate cmd_vel publishing in teleop (timer + immediate)
 - [ ] Calculate accurate URDF inertia values (using placeholders)
 
@@ -166,7 +166,7 @@
 - **Encoder:** 3 magnets, 288 ticks/wheel rev (quadrature)
 - **Driver:** L298N dual H-bridge
 - **Lidar:** RPLIDAR A1 (0.15-12m range, 5.5-10Hz, 8kHz sample rate)
-- **Wheels:** 65mm diameter, 165mm wheel base
+- **Wheels:** 65mm diameter, 165mm physical wheel base (0.236m effective)
 
 ### GPIO Pin Map (BCM)
 | Function | Pin |

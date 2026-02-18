@@ -1,6 +1,6 @@
 motor_controller:
   ros__parameters:
-    wheel_base: 0.165
+    wheel_base: 0.236
     wheel_diameter: 0.065
     encoder_ticks_per_rev: 288
     max_speed: 0.5

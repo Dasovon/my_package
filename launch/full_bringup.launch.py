@@ -11,6 +11,8 @@ Launches all core robot nodes:
 - Robot State Publisher (URDF/TF)
 - Motor Controller (odometry + cmd_vel)
 - RPLIDAR (laser scan)
+- BNO055 IMU
+- robot_localization EKF (fused odometry)
 
 Usage:
     ros2 launch my_robot_bringup full_bringup.launch.py
@@ -23,6 +25,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -48,11 +51,14 @@ def generate_launch_description():
             }.items(),
         ),
 
-        # Motor Controller (odometry + cmd_vel)
+        # Motor Controller (odometry + cmd_vel, TF disabled - EKF publishes TF)
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(pkg_dir, 'launch', 'motor_control.launch.py'),
             ),
+            launch_arguments={
+                'publish_odom_tf': 'false',
+            }.items(),
         ),
 
         # RPLIDAR A1 (laser scan)
@@ -60,5 +66,30 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(pkg_dir, 'launch', 'rplidar.launch.py'),
             ),
+        ),
+
+        # BNO055 IMU
+        Node(
+            package='bno055',
+            executable='bno055',
+            name='bno055',
+            parameters=[os.path.join(pkg_dir, 'config', 'bno055.yaml')],
+        ),
+
+        # Static transform: base_link -> imu_link
+        # Adjust xyz if IMU is not at robot center
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='imu_tf',
+            arguments=['0', '0', '0', '0', '0', '0', 'base_link', 'imu_link'],
+        ),
+
+        # EKF - fuses wheel odometry + IMU, publishes odom -> base_footprint TF
+        Node(
+            package='robot_localization',
+            executable='ekf_node',
+            name='ekf_node',
+            parameters=[os.path.join(pkg_dir, 'config', 'ekf.yaml')],
         ),
     ])

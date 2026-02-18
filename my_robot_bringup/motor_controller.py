@@ -33,7 +33,7 @@ class MotorController(Node):
         super().__init__('motor_controller')
 
         # Declare parameters
-        self.declare_parameter('wheel_base', 0.165)
+        self.declare_parameter('wheel_base', 0.236)
         self.declare_parameter('wheel_diameter', 0.065)
         self.declare_parameter('encoder_ticks_per_rev', 288)  # 3 magnets * 2 edges * 48:1 gear
         self.declare_parameter('max_speed', 0.5)
@@ -58,6 +58,7 @@ class MotorController(Node):
         self.declare_parameter('encoder_right_inverted', False)
         self.declare_parameter('encoder_bouncetime_ms', 0)
         self.declare_parameter('enable_debug_logging', False)
+        self.declare_parameter('publish_odom_tf', True)
 
         # Get parameters
         self.wheel_base = self.get_parameter('wheel_base').value
@@ -75,6 +76,7 @@ class MotorController(Node):
         self.left_encoder_inverted = self.get_parameter('encoder_left_inverted').value
         self.right_encoder_inverted = self.get_parameter('encoder_right_inverted').value
         self.encoder_bouncetime_ms = int(self.get_parameter('encoder_bouncetime_ms').value)
+        self.publish_odom_tf = self.get_parameter('publish_odom_tf').value
 
         # Calculate wheel geometry
         self.wheel_circumference = math.pi * self.wheel_diameter
@@ -336,7 +338,7 @@ class MotorController(Node):
             return 0.0
 
         # Map velocity range to duty range
-        velocity_fraction = abs(velocity) / self.max_speed
+        velocity_fraction = min(abs(velocity) / self.max_speed, 1.0)
         duty = self.min_duty + (velocity_fraction * (self.max_duty - self.min_duty))
 
         return duty if velocity >= 0 else -duty
@@ -380,7 +382,8 @@ class MotorController(Node):
         t.transform.translation.z = 0.0
         t.transform.rotation = quat
 
-        self.tf_broadcaster.sendTransform(t)
+        if self.publish_odom_tf:
+            self.tf_broadcaster.sendTransform(t)
 
         # Odometry message
         odom = Odometry()
