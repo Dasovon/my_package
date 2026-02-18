@@ -1,6 +1,6 @@
 # Project Roadmap and TODO List
 
-**Last Updated:** February 12, 2026
+**Last Updated:** February 17, 2026
 
 ---
 
@@ -85,27 +85,21 @@
 ## Phase 5: SLAM and Mapping (IN PROGRESS)
 
 ### slam_toolbox Setup
-- [x] Install slam_toolbox on robot
+- [x] Install slam_toolbox on dev machine
 - [x] Create slam.yaml config tuned for hardware
 - [x] Verify TF tree: map -> odom -> base_footprint -> base_link -> laser_frame
-- [x] Launch SLAM alongside full_bringup
+- [x] Launch SLAM alongside full_bringup (use `slam.launch.py` wrapper)
 - [x] Visualize map building in rviz2 from dev machine
-- [ ] **Fix map drift/quality** -- map is unstable during driving
-  - Root cause: 288 ticks/rev encoder resolution is too low for
-    reliable odometry (articubot_one uses 3436 ticks/rev = 12x more)
-  - Heading drift measured at ~10 deg over 600mm straight-line travel
-  - SLAM params tuned conservatively (matching articubot_one) across
-    multiple sessions -- param tuning alone is insufficient
-  - correlation_search_space_dimension > 0.5 crashes Pi (out of memory)
-  - **Next steps to try (priority order):**
-    - [x] Tune wheel_base via rotation calibration (0.165m -> 0.236m, heading error now <1%)
-    - [ ] Add BNO055 IMU for heading correction (I2C/UART)
-          -- would dramatically improve odometry quality for SLAM
-    - [ ] Test with robot_localization EKF once IMU added
-    - [ ] Try sync mode instead of async
-    - [ ] Upgrade to higher-resolution encoders (last resort, hardware change)
-- [ ] Save and load maps
+- [x] Tune wheel_base via rotation calibration (0.165m -> 0.236m, heading error now <0.1%)
+- [x] Add BNO055 IMU (I2C bus 1, address 0x28) -- integrated and publishing
+- [x] Add robot_localization EKF -- fusing /odom + /imu/data -> /odometry/filtered
+- [x] Save initial maps (maps/ dir: .pgm/.yaml + slam_toolbox serialized)
+- [ ] **SLAM map stable during driving** -- map froze during last test session
+  - TF ownership fixed (motor controller owns odom TF, EKF publish_tf: false)
+  - RPLIDAR has USB power instability -- needs powered USB hub
+  - Session ended before confirming fix -- test first thing next session
 - [ ] Map a full room successfully
+- [ ] IMU calibration -- BNO055 gyro needs calibration (leave still 30s on startup)
 
 ---
 
@@ -128,11 +122,11 @@
 ## Phase 7: Advanced Features (Future)
 
 ### Additional Sensors
-- [ ] BNO055 IMU (I2C/UART) -- would significantly improve odometry
+- [x] BNO055 IMU -- integrated (I2C, address 0x28, NDOF mode, 100Hz)
 - [ ] RealSense D435i depth camera
 
 ### Sensor Fusion
-- [ ] IMU + wheel odometry fusion (robot_localization EKF)
+- [x] IMU + wheel odometry fusion (robot_localization EKF) -- running, not yet owning TF
 - [ ] Visual odometry from RealSense
 
 ### Computer Vision
@@ -144,13 +138,15 @@
 ## Known Issues
 
 ### To Fix
-- [ ] Map drift during SLAM (encoder resolution limiting factor)
+- [ ] SLAM map freezing during driving -- likely fixed (test next session)
 - [x] ~~Heading drift ~10 deg over 600mm straight-line travel~~ -- fixed via wheel_base calibration (0.236m)
+- [ ] RPLIDAR USB power instability -- get powered USB hub
 - [ ] Remove duplicate cmd_vel publishing in teleop (timer + immediate)
 - [ ] Calculate accurate URDF inertia values (using placeholders)
 
 ### Resolved
-- [x] ROS_DOMAIN_ID -- both machines using default 0, cross-machine comms working
+- [x] ROS_DOMAIN_ID -- both machines using default 0 (dev machine had 42 in .bashrc, removed 2026-02-12)
+- [x] Right encoder dead -- VCC and signal A wires disconnected (fixed 2026-02-17)
 
 ### To Investigate
 - [ ] WiFi power management on Pi (potential disconnects)

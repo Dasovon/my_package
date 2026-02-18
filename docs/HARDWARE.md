@@ -16,7 +16,8 @@ Complete hardware specifications, wiring, motor configuration, and software depe
 - **Wheel radius:** 0.032375 m
 - **Wheel diameter:** 0.06475 m
 - **Wheel width:** 0.058 m
-- **Wheel base (distance between wheels):** 0.165 m
+- **Wheel base (physical center-to-center):** 0.165 m
+- **Wheel base (effective, calibrated):** 0.236 m — use this in software
 - **Wheel circumference:** 0.2034 m
 
 ### Encoders (DG01D-E)
@@ -49,7 +50,7 @@ Complete hardware specifications, wiring, motor configuration, and software depe
 
 ### Network
 - **Subnet:** 192.168.86.0/24
-- **ROS_DOMAIN_ID:** 42
+- **ROS_DOMAIN_ID:** 0 (default — do NOT set it in .bashrc)
 - **Router:** 802.11ac or better (2.4GHz and/or 5GHz)
 
 ---
@@ -59,21 +60,27 @@ Complete hardware specifications, wiring, motor configuration, and software depe
 ### RPLIDAR A1 - 2D Laser Scanner
 - **Status:** Integrated
 - **Range:** 0.15m - 12m
-- **Sample Rate:** 8000 samples/second
-- **Scan Rate:** 5.5 Hz
-- **Angular Resolution:** 1 degree
-- **Interface:** USB (via UART adapter)
-- **Power:** 5V via USB
+- **Scan Mode:** Standard (2kHz sample rate, 10Hz scan rate)
+- **Angular Resolution:** ~1 degree
+- **Interface:** USB → CP2102 UART adapter
+- **Serial Port:** `/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0` (ALWAYS use by-id path — ttyUSBx number changes on every power cycle)
 - **ROS Driver:** `rplidar_ros`
-- **Frame ID:** `laser` or `laser_frame`
+- **Frame ID:** `laser_frame`
+- **URDF orientation:** `rpy="0 0 ${pi}"` — cable faces back, 0° points away from cable, pi rotation aligns it forward. **Do not change this.**
+- **Known issue:** USB power instability causes periodic crashes. Fix: powered USB hub. Workaround: `respawn=True` in rplidar.launch.py.
 
 ### BNO055 - 9-Axis IMU
-- **Status:** Planned
-- **Sensors:** Accelerometer, gyroscope, magnetometer
-- **Interface:** I2C or UART
-- **Update Rate:** Up to 100Hz
-- **ROS Driver:** `bno055` package
+- **Status:** Integrated (2026-02-17)
+- **Sensors:** Accelerometer, gyroscope, magnetometer (9-DOF)
+- **Interface:** I2C, bus 1, address 0x28
+- **Operation Mode:** NDOF (0x0C) — full sensor fusion
+- **Update Rate:** 100Hz
+- **ROS Driver:** `ros-humble-bno055`
 - **Frame ID:** `imu_link`
+- **Wiring:** VIN→3.3V, GND→GND, SDA→GPIO2 (pin 3), SCL→GPIO3 (pin 5), ADR floating
+- **Static TF:** `base_link` → `imu_link` at origin (0,0,0), identity rotation
+- **Config:** `config/bno055.yaml`
+- **Topics:** `/imu/data` (fused), `/imu/imu_raw`, `/imu/mag`, `/imu/calib_status`
 
 ### Intel RealSense D435i - Depth Camera
 - **Status:** Planned
@@ -160,11 +167,12 @@ Encoders use `GPIO.add_event_detect()` on both channels for accurate quadrature 
 | `encoder_ticks_per_rev` | 288 | 3 pulses x 2 edges x 48:1 gear ratio |
 | `encoder_left_inverted` | True | Compensates for mirrored left motor mount |
 | `encoder_right_inverted` | False | Normal direction |
-| `encoder_bouncetime_ms` | 1 | GPIO edge detection debounce (ms) |
+| `encoder_bouncetime_ms` | 0 | Disabled — hall effect sensors don't need debounce |
 
 ### Encoder Power
-- **+5V:** Physical pins 2 or 4
-- **GND:** Physical pins 6 or 9
+- **VCC:** 3.3V — Physical pins 1 or 17
+- **GND:** Any ground pin
+- **NOTE:** Right encoder VCC (pin 1/17) and signal A (GPIO 25, pin 22) were found disconnected 2026-02-17 causing right wheel to report 0 ticks. Always verify encoder wiring if one wheel shows constant 0 in /joint_states.
 
 ---
 
@@ -174,7 +182,7 @@ Encoders use `GPIO.add_event_detect()` on both channels for accurate quadrature 
 ```yaml
 motor_controller:
   ros__parameters:
-    wheel_base: 0.165              # Distance between wheels (m)
+    wheel_base: 0.236              # Effective wheel base (calibrated)
     wheel_diameter: 0.06475        # Wheel diameter (m)
     encoder_ticks_per_rev: 288     # 3 pulses x 2 edges x 48:1 gear
     max_speed: 0.5                 # Maximum linear velocity (m/s)
@@ -266,16 +274,19 @@ v_right = linear.x + (angular.z * wheel_base / 2.0)
 ### On Robot (Raspberry Pi)
 ```bash
 sudo apt install python3-rpi.gpio
-# Or: pip3 install RPi.GPIO --break-system-packages
+sudo apt install ros-humble-robot-localization
+sudo apt install ros-humble-bno055
 ```
 - Motor control: `RPi.GPIO`
-- Sensor drivers: `rplidar_ros`
+- Sensor drivers: `rplidar_ros`, `bno055`
+- Sensor fusion: `robot_localization` (EKF)
 - Core ROS 2: `rclpy`, message packages, `tf2_ros`
 - Robot description: `xacro`, `robot_state_publisher`
 
 ### On Dev Machine (additionally)
 ```bash
 sudo apt install ros-humble-gazebo-ros-pkgs ros-humble-rviz2
+sudo apt install ros-humble-slam-toolbox
 ```
 
 ### All ROS 2 Dependencies

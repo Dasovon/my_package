@@ -97,7 +97,7 @@ sudo apt install -y ros-humble-xacro ros-humble-joint-state-publisher
 export PATH="$HOME/.local/bin:$PATH"
 source /opt/ros/humble/setup.bash
 source ~/dev_ws/install/setup.bash
-export ROS_DOMAIN_ID=42
+# DO NOT set ROS_DOMAIN_ID -- use default (0)
 export ROS_LOCALHOST_ONLY=0
 ```
 
@@ -105,7 +105,7 @@ export ROS_LOCALHOST_ONLY=0
 ```bash
 source /opt/ros/humble/setup.bash
 source ~/robot_ws/install/setup.bash
-export ROS_DOMAIN_ID=42
+# DO NOT set ROS_DOMAIN_ID -- use default (0)
 export ROS_LOCALHOST_ONLY=0
 ```
 
@@ -155,11 +155,11 @@ cd ~/robot_ws && colcon build --symlink-install && source install/setup.bash
 
 | | Robot (hoverbot) | Dev Machine |
 |---|---|---|
-| **Hardware** | Raspberry Pi 4/5 | Ubuntu 22.04 Desktop |
+| **Hardware** | Raspberry Pi 4 | Ubuntu 22.04 Desktop |
 | **IP** | 192.168.86.33 | 192.168.86.37 |
 | **Workspace** | `~/robot_ws` | `~/dev_ws` |
 | **ROS install** | `ros-humble-ros-base` | `ros-humble-desktop` |
-| **ROS_DOMAIN_ID** | 42 | 42 |
+| **ROS_DOMAIN_ID** | 0 (default) | 0 (default) |
 
 ### 2.1 Power On and Connect
 
@@ -198,11 +198,11 @@ If dependencies are missing: `rosdep install --from-paths src --ignore-src -r -y
 # GPIO access
 python3 -c "import RPi.GPIO; print('GPIO OK')"
 
-# RPLIDAR device
-ls /dev/ttyUSB0
+# RPLIDAR device (use by-id path, NOT ttyUSBx)
+ls /dev/serial/by-id/
 
-# If RPLIDAR permissions fail:
-sudo chmod 666 /dev/ttyUSB0
+# IMU
+i2cdetect -y 1  # should show device at 0x28
 ```
 
 If GPIO shows `Permission denied`: `sudo usermod -a -G gpio $USER` then log out/in.
@@ -215,22 +215,27 @@ ros2 launch my_robot_bringup full_bringup.launch.py
 
 This starts:
 1. **Robot State Publisher** -- URDF + TF tree
-2. **Motor Controller** -- `/cmd_vel` -> `/odom`
-3. **RPLIDAR** -- `/scan`
+2. **Motor Controller** -- `/cmd_vel` → `/odom` + `odom→base_footprint` TF
+3. **RPLIDAR** -- `/scan` (with auto-respawn)
+4. **BNO055 IMU** -- `/imu/data`
+5. **Static TF** -- `base_link` → `imu_link`
+6. **EKF** -- fuses `/odom` + `/imu/data` → `/odometry/filtered`
 
 If you see `RuntimeError: Failed to add edge detection`, another process has the GPIO pins. Stop other ROS/motor processes, wait a few seconds, and relaunch. If it persists: `sudo reboot`.
 
 **Verify nodes:**
 ```bash
 ros2 node list
-# Expected: /robot_state_publisher /motor_controller /rplidar_node
+# Expected: /robot_state_publisher /motor_controller /rplidar_node /bno055 /imu_tf /ekf_node
 ```
 
 **Verify topics and rates:**
 ```bash
 ros2 topic list
-ros2 topic hz /scan
-ros2 topic hz /odom
+ros2 topic hz /scan          # ~10 Hz
+ros2 topic hz /odom          # ~50 Hz
+ros2 topic hz /imu/data      # ~100 Hz
+ros2 topic hz /odometry/filtered  # ~30 Hz
 ```
 
 Key topics:
@@ -239,8 +244,16 @@ Key topics:
 |-------|--------|------|
 | `/cmd_vel` | Teleop / Nav | `geometry_msgs/msg/Twist` |
 | `/odom` | Motor controller | `nav_msgs/msg/Odometry` |
+| `/odometry/filtered` | EKF | `nav_msgs/msg/Odometry` |
 | `/scan` | RPLIDAR | `sensor_msgs/msg/LaserScan` |
-| `/tf` | RSP + Motor controller | `tf2_msgs/msg/TFMessage` |
+| `/imu/data` | BNO055 | `sensor_msgs/msg/Imu` |
+| `/tf` | Motor controller + RSP | `tf2_msgs/msg/TFMessage` |
+
+**SLAM (run on dev machine):**
+```bash
+ros2 launch my_robot_bringup slam.launch.py
+```
+Then open rviz2, Fixed Frame: `map`, add Map (`/map`) and LaserScan (`/scan`).
 
 ### 2.4 Driving the Robot
 
@@ -326,7 +339,7 @@ ros2 launch my_robot_bringup teleop_keyboard.launch.py
 ### Network and Connectivity
 
 **Nodes not discovering each other:**
-1. Check `echo $ROS_DOMAIN_ID` on both machines (should be 42)
+1. Check `echo $ROS_DOMAIN_ID` on both machines (should be blank or 0)
 2. `ping hoverbot` / `ping dev`
 3. `ros2 daemon stop && ros2 daemon start` on both
 4. `sudo ufw status` -- should be inactive or allow multicast
@@ -357,12 +370,13 @@ ros2 launch my_robot_bringup teleop_keyboard.launch.py
 
 ### ROS 2 Configuration
 
-**ROS_DOMAIN_ID not persisting:**
+**ROS_DOMAIN_ID causing cross-machine issues:**
+Do NOT set `ROS_DOMAIN_ID` in `.bashrc` on either machine. Use the default (0).
+If it's there, remove it: `nano ~/.bashrc` and delete the line.
 Correct `.bashrc` order:
 ```bash
 source /opt/ros/humble/setup.bash
 source ~/dev_ws/install/setup.bash
-export ROS_DOMAIN_ID=42
 export ROS_LOCALHOST_ONLY=0
 ```
 
