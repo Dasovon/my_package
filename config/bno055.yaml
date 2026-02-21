@@ -9,4 +9,9 @@ bno055:
     placement_axis_remap: "P1"   # Flat mount, chip facing up
     data_query_frequency: 100    # 100 Hz
     calib_status_frequency: 0.1
-    set_offsets: false
+    set_offsets: true
+    offset_acc: [0xFFF4, 0xFFFE, 0xFFDE]  # [-12, -2, -34] mg
+    offset_mag: [0xFF35, 0x00E4, 0x0226]  # [-203, 228, 550] uT/16
+    offset_gyr: [0xFFFF, 0x0000, 0xFFFF]  # [-1, 0, -1] dps/16
+    radius_acc: 1000
+    radius_mag: 720

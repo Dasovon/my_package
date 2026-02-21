@@ -16,6 +16,7 @@ The robot is a differential drive hoverbot on a Raspberry Pi 4. As of this sessi
 - Motor min duty increased to 90% (motors were underpowered at 80%)
 - **SLAM WORKING** — map builds and persists while driving
 - slam.yaml tuned: resolution 0.025, smear deviation 0.03, link match response 0.45
+- **BNO055 IMU CALIBRATED** — all 3s on calib_status; offsets saved to config/bno055.yaml
 
 ---
 
@@ -175,6 +176,9 @@ map (published by slam_toolbox on dev machine)
 - operation_mode: 0x0C (NDOF)
 - ros_topic_prefix: "imu/"
 - data_query_frequency: 100
+- `set_offsets: true` — calibration offsets saved and loaded on startup
+- offset_acc: [-12, -2, -34] mg | offset_mag: [-203, 228, 550] uT/16 | offset_gyr: [-1, 0, -1] dps/16
+- radius_acc: 1000 | radius_mag: 720
 
 ### `my_robot_bringup/lidar_watchdog.py` (new)
 - Monitors `/scan` subscriber count every 2 seconds
@@ -318,7 +322,7 @@ Two known causes:
 
 1. ~~**Test SLAM properly**~~ — **DONE**. SLAM working, map builds and persists.
 
-2. **IMU calibration** — BNO055 gyro offsets look uncalibrated (values like 65535). The NDOF mode does self-calibration: leave robot still for ~30s for gyro cal, move in figure-8 for mag cal. Check `/imu/calib_status` topic.
+2. ~~**IMU calibration**~~ — **DONE 2026-02-20**. Achieved all 3s on calib_status. Offsets saved to `config/bno055.yaml` (`set_offsets: true`). Robot starts calibrated from now on.
 
 3. ~~**Save a good map**~~ — **DONE**. Saved 2026-02-20:
    - `maps/my_map.pgm` + `maps/my_map.yaml` — nav2 format

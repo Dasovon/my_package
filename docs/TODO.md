@@ -99,7 +99,7 @@
 - [x] **SLAM map stable during driving** -- working as of 2026-02-20, map builds and persists
 - [x] SLAM map quality tuned -- resolution 0.025, smear deviation 0.03, link match response 0.45
 - [x] Map a full room successfully and save -- done 2026-02-20 (maps/my_map.*)
-- [ ] IMU calibration -- BNO055 gyro needs calibration (leave still 30s on startup)
+- [x] IMU calibration -- BNO055 fully calibrated (all 3s), offsets saved to config/bno055.yaml (set_offsets: true)
 
 ---
 
