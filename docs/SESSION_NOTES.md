@@ -1,5 +1,5 @@
 # Session Notes — For Future Claude Sessions
-**Last updated: 2026-02-17**
+**Last updated: 2026-02-20**
 **Read this at the start of every session. It covers everything done so far.**
 
 ---
@@ -92,6 +92,7 @@ Nodes launched by `full_bringup.launch.py`:
 4. **bno055** — publishes `/imu/data`, `/imu/imu_raw`, etc.
 5. **static_transform_publisher** — `base_link` → `imu_link` (0,0,0)
 6. **ekf_node** — fuses `/odom` + `/imu/data` → `/odometry/filtered`
+7. **lidar_watchdog** — stops RPLIDAR motor when `/scan` has no subscribers, restarts when a subscriber appears
 
 ### TF Tree
 ```
@@ -161,11 +162,18 @@ map (published by slam_toolbox on dev machine)
 - ros_topic_prefix: "imu/"
 - data_query_frequency: 100
 
+### `my_robot_bringup/lidar_watchdog.py` (new)
+- Monitors `/scan` subscriber count every 2 seconds
+- Calls `/stop_motor` when count drops to 0, `/start_motor` when count rises above 0
+- Conserves battery during coding sessions when SLAM/rviz are not running
+- Motor can also be toggled manually: `ros2 service call /stop_motor std_srvs/srv/Empty {}` / `ros2 service call /start_motor std_srvs/srv/Empty {}`
+
 ### `launch/full_bringup.launch.py`
 - Added BNO055 node
 - Added static TF publisher (base_link → imu_link)
 - Added EKF node
 - Motor controller launched with `publish_odom_tf: true`
+- Added lidar_watchdog node
 
 ### `launch/motor_control.launch.py`
 - Added `publish_odom_tf` launch argument (default 'true'), passed to node parameters
@@ -290,9 +298,7 @@ Two known causes:
    ros2 service call /slam_toolbox/save_map slam_toolbox/srv/SaveMap "{name: {data: 'my_map_slam'}}"
    ```
 
-4. **Commit and push** changes — ekf.yaml, full_bringup.launch.py, rplidar.launch.py, slam.yaml changes from this session are NOT yet pushed to GitHub.
-
-5. **Powered USB hub** — RPLIDAR keeps entering bad states, likely due to Pi USB current limits. A powered hub would stabilize it.
+4. **Powered USB hub** — RPLIDAR keeps entering bad states, likely due to Pi USB current limits. A powered hub would stabilize it.
 
 ---
 
