@@ -1,6 +1,6 @@
 # Project Roadmap and TODO List
 
-**Last Updated:** February 20, 2026
+**Last Updated:** February 20, 2026 (session 3)
 
 ---
 
@@ -96,8 +96,9 @@
 - [x] Save initial maps (maps/ dir: .pgm/.yaml + slam_toolbox serialized)
 - [x] RPLIDAR USB auto power cycle -- lidar_watchdog detects crashes and power cycles USB automatically (requires sudoers rule, see SESSION_NOTES.md)
 - [x] Lidar motor watchdog -- stops motor when nothing subscribed to /scan, starts when SLAM/rviz connects
-- [ ] **SLAM map stable during driving** -- TF is fixed, lidar is stable, test next session
-- [ ] Map a full room successfully
+- [x] **SLAM map stable during driving** -- working as of 2026-02-20, map builds and persists
+- [x] SLAM map quality tuned -- resolution 0.025, smear deviation 0.03, link match response 0.45
+- [ ] Map a full room successfully and save
 - [ ] IMU calibration -- BNO055 gyro needs calibration (leave still 30s on startup)
 
 ---
@@ -137,7 +138,7 @@
 ## Known Issues
 
 ### To Fix
-- [ ] SLAM map freezing during driving -- test next session (TF and lidar now stable)
+- [x] ~~SLAM map freezing during driving~~ -- fixed (TF ownership + lidar watchdog)
 - [x] ~~Heading drift ~10 deg over 600mm straight-line travel~~ -- fixed via wheel_base calibration (0.236m)
 - [ ] RPLIDAR USB power instability -- auto power cycle workaround added; get powered USB hub for real fix
 - [ ] Remove duplicate cmd_vel publishing in teleop (timer + immediate)

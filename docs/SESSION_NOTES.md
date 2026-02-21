@@ -1,5 +1,5 @@
 # Session Notes — For Future Claude Sessions
-**Last updated: 2026-02-20 (session 2)**
+**Last updated: 2026-02-20 (session 3)**
 **Read this at the start of every session. It covers everything done so far.**
 
 ---
@@ -14,7 +14,8 @@ The robot is a differential drive hoverbot on a Raspberry Pi 4. As of this sessi
 - EKF (robot_localization) is running but NOT publishing TF (motor controller owns TF)
 - RPLIDAR A1 USB instability mostly resolved via auto power cycle in lidar_watchdog
 - Motor min duty increased to 90% (motors were underpowered at 80%)
-- SLAM not yet fully tested — lidar issues interrupted session
+- **SLAM WORKING** — map builds and persists while driving
+- slam.yaml tuned: resolution 0.025, smear deviation 0.03, link match response 0.45
 
 ---
 
@@ -129,7 +130,9 @@ map (published by slam_toolbox on dev machine)
 - Config: `config/slam.yaml`
 - Key params: `base_frame: base_footprint`, `transform_timeout: 0.5`, `minimum_travel_distance: 0.2`
 
-**SLAM STATUS: NOT FULLY WORKING YET**. At end of session, map was briefly appearing then freezing. TF errors were resolved by switching TF ownership back to motor controller. Next session should try SLAM again — it may work now that TF is stable.
+**SLAM STATUS: WORKING**. Map builds and persists while driving. Tuned for better quality — thinner walls, finer resolution.
+
+**rviz2 tip**: To reduce LaserScan dot size → click LaserScan display → **Size (m)**: `0.02`, **Style**: `Points`.
 
 ---
 
@@ -158,6 +161,9 @@ map (published by slam_toolbox on dev machine)
 - `minimum_travel_distance: 0.2` (was 0.5)
 - `minimum_travel_heading: 0.25` (was 0.5)
 - `transform_timeout: 0.5` (was 0.2)
+- `resolution: 0.025` (was 0.05) — finer map grid
+- `link_match_minimum_response_fine: 0.45` (was 0.1) — only high-quality scans accepted
+- `correlation_search_space_smear_deviation: 0.03` (was 0.1) — less wall smearing
 
 ### `config/ekf.yaml` (new)
 - Fuses /odom + /imu/data
@@ -310,7 +316,7 @@ Two known causes:
 
 ## What's Left (Next Session)
 
-1. **Test SLAM properly** — lidar is now stable, bringup is clean. Try building a map. The map should persist while driving.
+1. ~~**Test SLAM properly**~~ — **DONE**. SLAM working, map builds and persists.
 
 2. **IMU calibration** — BNO055 gyro offsets look uncalibrated (values like 65535). The NDOF mode does self-calibration: leave robot still for ~30s for gyro cal, move in figure-8 for mag cal. Check `/imu/calib_status` topic.
 

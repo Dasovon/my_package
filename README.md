@@ -1,6 +1,6 @@
 # Hoverbot - ROS 2 Mobile Robot Project
 
-**Status:** Base ROS 2 system configured ✅ | Motor control implemented ✅ | Sensors integrated ✅ | SLAM in progress 🚧
+**Status:** Base ROS 2 system configured ✅ | Motor control implemented ✅ | Sensors integrated ✅ | SLAM working ✅ | Navigation planned 📋
 
 A battery-powered mobile robot that currently runs on a small DC gearmotor chassis with L298N control and RPLIDAR + wheel encoders, before moving to a hoverboard drive base. Running ROS 2 Humble on Ubuntu 22.04.
 
@@ -38,10 +38,11 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for complete bill of materials and spec
 - [x] BNO055 IMU integration (I2C, NDOF mode, 100Hz)
 - [x] EKF sensor fusion (wheel odom + IMU)
 - [x] RPLIDAR lidar watchdog (auto motor stop/start, auto USB power cycle)
+- [x] SLAM mapping working (slam_toolbox, tuned for quality)
 - [x] Gazebo simulation setup
 
 ### 🚧 In Progress
-- [ ] SLAM map building (slam_toolbox, TF stable, testing in progress)
+- [ ] Save and reuse a complete room map
 - [ ] IMU calibration (BNO055 NDOF self-cal)
 
 ### 📋 Planned
