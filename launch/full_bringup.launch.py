@@ -92,4 +92,12 @@ def generate_launch_description():
             name='ekf_node',
             parameters=[os.path.join(pkg_dir, 'config', 'ekf.yaml')],
         ),
+
+        # Lidar watchdog - stops motor when /scan has no subscribers (saves battery)
+        Node(
+            package='my_robot_bringup',
+            executable='lidar_watchdog.py',
+            name='lidar_watchdog',
+            output='screen',
+        ),
     ])

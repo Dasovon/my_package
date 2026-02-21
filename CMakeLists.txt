@@ -39,6 +39,7 @@ install(DIRECTORY worlds
 install(PROGRAMS
   my_robot_bringup/motor_controller.py
   my_robot_bringup/teleop_keyboard.py
+  my_robot_bringup/lidar_watchdog.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
