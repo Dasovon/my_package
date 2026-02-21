@@ -21,7 +21,7 @@ if(BUILD_TESTING)
 endif()
 
 # Install launch and config directories
-install(DIRECTORY launch config
+install(DIRECTORY launch config maps
   DESTINATION share/${PROJECT_NAME}
 )
 
