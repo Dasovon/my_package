@@ -1,5 +1,5 @@
 # Session Notes — For Future Claude Sessions
-**Last updated: 2026-02-20**
+**Last updated: 2026-02-20 (session 2)**
 **Read this at the start of every session. It covers everything done so far.**
 
 ---
@@ -12,8 +12,9 @@ The robot is a differential drive hoverbot on a Raspberry Pi 4. As of this sessi
 - Both encoders are wired and working
 - BNO055 IMU is wired and initialized
 - EKF (robot_localization) is running but NOT publishing TF (motor controller owns TF)
-- RPLIDAR A1 is running but has USB power instability issues
-- SLAM was tested but map was freezing — session ended before it was solved
+- RPLIDAR A1 USB instability mostly resolved via auto power cycle in lidar_watchdog
+- Motor min duty increased to 90% (motors were underpowered at 80%)
+- SLAM not yet fully tested — lidar issues interrupted session
 
 ---
 
@@ -77,8 +78,15 @@ The robot is a differential drive hoverbot on a Raspberry Pi 4. As of this sessi
   - Buffer overflow crash → stale process on wrong port (check `lsof /dev/ttyUSBx`)
   - Two processes fighting over port → kill both, restart one
   - Stuck process (no "Start" message) → `kill -9 <pid>` then power cycle USB
-  - **Fix added**: `respawn=True, respawn_delay=3.0` in rplidar.launch.py so it auto-restarts
+  - **Fix added**: `respawn=True, respawn_delay=7.0` in rplidar.launch.py so it auto-restarts
+  - **Fix added**: lidar_watchdog auto power cycles USB on crash (see sudoers setup below)
   - **Long term fix needed**: powered USB hub
+
+**RPLIDAR USB AUTO POWER CYCLE**: lidar_watchdog detects crashes and power cycles `/sys/bus/usb/devices/1-1.2/authorized`. Requires one-time sudoers setup on Pi:
+```bash
+echo 'ryan ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/bus/usb/devices/1-1.2/authorized' | sudo tee /etc/sudoers.d/lidar-power-cycle
+```
+Without this, watchdog logs an error with the fix instructions. The power cycle has a 10s cooldown to prevent loops.
 
 ---
 
@@ -92,7 +100,7 @@ Nodes launched by `full_bringup.launch.py`:
 4. **bno055** — publishes `/imu/data`, `/imu/imu_raw`, etc.
 5. **static_transform_publisher** — `base_link` → `imu_link` (0,0,0)
 6. **ekf_node** — fuses `/odom` + `/imu/data` → `/odometry/filtered`
-7. **lidar_watchdog** — stops RPLIDAR motor when `/scan` has no subscribers, restarts when a subscriber appears
+7. **lidar_watchdog** — stops RPLIDAR motor when `/scan` has no subscribers, restarts when a subscriber appears; auto power cycles USB on crash
 
 ### TF Tree
 ```
@@ -166,6 +174,8 @@ map (published by slam_toolbox on dev machine)
 - Monitors `/scan` subscriber count every 2 seconds
 - Calls `/stop_motor` when count drops to 0, `/start_motor` when count rises above 0
 - Conserves battery during coding sessions when SLAM/rviz are not running
+- Auto power cycles USB when crash detected (service goes unavailable), with 10s cooldown
+- 8s grace period after startup before it will stop the motor (prevents SDK timeout)
 - Motor can also be toggled manually: `ros2 service call /stop_motor std_srvs/srv/Empty {}` / `ros2 service call /start_motor std_srvs/srv/Empty {}`
 
 ### `launch/full_bringup.launch.py`
@@ -174,6 +184,12 @@ map (published by slam_toolbox on dev machine)
 - Added EKF node
 - Motor controller launched with `publish_odom_tf: true`
 - Added lidar_watchdog node
+
+### `launch/rplidar.launch.py`
+- `respawn_delay`: 3.0 → **7.0** (allows watchdog power cycle to complete before respawn)
+
+### `config/motor_controller.yaml`
+- `min_duty_cycle`: 80 → **90** (motors were underpowered)
 
 ### `launch/motor_control.launch.py`
 - Added `publish_odom_tf` launch argument (default 'true'), passed to node parameters
@@ -247,8 +263,14 @@ ps aux | grep -E "ros2|rplidar_composition|motor_controller.py|bno055|ekf_node|r
 ```
 Then relaunch once.
 
-### RPLIDAR health error 80008002
-Power cycle the USB. The device may also move from ttyUSB0 → ttyUSB1 → ttyUSB2 after each cycle — the by-id path handles this automatically.
+### RPLIDAR health error 80008002 / 80008000 / 80008001
+The lidar_watchdog auto power cycles USB when it detects a crash — no manual action needed if the sudoers rule is set up. If not set up, the watchdog logs the fix command.
+
+Manual power cycle:
+```bash
+echo '0' | sudo tee /sys/bus/usb/devices/1-1.2/authorized && sleep 2 && echo '1' | sudo tee /sys/bus/usb/devices/1-1.2/authorized
+```
+The device may also move from ttyUSB0 → ttyUSB1 → ttyUSB2 after each cycle — the by-id path handles this automatically.
 
 ### RPLIDAR buffer overflow / 2 processes on same port
 ```bash
@@ -288,7 +310,7 @@ Two known causes:
 
 ## What's Left (Next Session)
 
-1. **Test SLAM properly** — at end of session, TF was fixed and bringup was clean. Relaunch everything and test if SLAM now builds a stable map. The map should persist while driving.
+1. **Test SLAM properly** — lidar is now stable, bringup is clean. Try building a map. The map should persist while driving.
 
 2. **IMU calibration** — BNO055 gyro offsets look uncalibrated (values like 65535). The NDOF mode does self-calibration: leave robot still for ~30s for gyro cal, move in figure-8 for mag cal. Check `/imu/calib_status` topic.
 
@@ -298,7 +320,17 @@ Two known causes:
    ros2 service call /slam_toolbox/save_map slam_toolbox/srv/SaveMap "{name: {data: 'my_map_slam'}}"
    ```
 
-4. **Powered USB hub** — RPLIDAR keeps entering bad states, likely due to Pi USB current limits. A powered hub would stabilize it.
+4. **Sudoers rule for USB power cycle** — must be run once on Pi if not already done:
+   ```bash
+   echo 'ryan ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/bus/usb/devices/1-1.2/authorized' | sudo tee /etc/sudoers.d/lidar-power-cycle
+   ```
+
+5. **Stale process cleanup** — always kill all nodes before relaunching to avoid duplicate node issues:
+   ```bash
+   ps aux | grep -E "rplidar_composition|motor_controller.py|bno055|ekf_node|robot_state_pub|static_transform|lidar_watchdog" | grep -v grep | awk '{print $2}' | xargs kill -9
+   ```
+
+6. **Powered USB hub** — RPLIDAR still benefits from better USB power. Auto power cycle works around it but a hub is the real fix.
 
 ---
 

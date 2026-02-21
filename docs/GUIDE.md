@@ -143,7 +143,7 @@ cd ~/robot_ws && colcon build --symlink-install && source install/setup.bash
 - ROS 2 Humble installed
 - `ping hoverbot` works from dev
 - Passwordless SSH configured
-- `echo $ROS_DOMAIN_ID` shows 42 on both
+- `echo $ROS_DOMAIN_ID` shows blank or 0 on both (do NOT set it)
 - Workspaces build successfully
 - Cross-machine topic communication verified
 
@@ -178,7 +178,7 @@ ssh hoverbot
 
 ```bash
 # Verify ROS environment
-echo $ROS_DOMAIN_ID        # Expected: 42
+echo $ROS_DOMAIN_ID        # Expected: blank or 0 (do NOT set this)
 echo $ROS_LOCALHOST_ONLY    # Expected: 0
 
 # Pull latest code
@@ -216,17 +216,24 @@ ros2 launch my_robot_bringup full_bringup.launch.py
 This starts:
 1. **Robot State Publisher** -- URDF + TF tree
 2. **Motor Controller** -- `/cmd_vel` → `/odom` + `odom→base_footprint` TF
-3. **RPLIDAR** -- `/scan` (with auto-respawn)
+3. **RPLIDAR** -- `/scan` (with auto-respawn at 7s delay)
 4. **BNO055 IMU** -- `/imu/data`
 5. **Static TF** -- `base_link` → `imu_link`
 6. **EKF** -- fuses `/odom` + `/imu/data` → `/odometry/filtered`
+7. **Lidar Watchdog** -- stops RPLIDAR motor when `/scan` has no subscribers; auto power cycles USB on crash
 
 If you see `RuntimeError: Failed to add edge detection`, another process has the GPIO pins. Stop other ROS/motor processes, wait a few seconds, and relaunch. If it persists: `sudo reboot`.
+
+**IMPORTANT — always kill stale nodes before relaunching:**
+```bash
+ps aux | grep -E "rplidar_composition|motor_controller.py|bno055|ekf_node|robot_state_pub|static_transform|lidar_watchdog" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null
+```
+Stale processes from previous launches fight over GPIO pins and cause motors to stop responding.
 
 **Verify nodes:**
 ```bash
 ros2 node list
-# Expected: /robot_state_publisher /motor_controller /rplidar_node /bno055 /imu_tf /ekf_node
+# Expected: /robot_state_publisher /motor_controller /rplidar_node /bno055 /imu_tf /ekf_node /lidar_watchdog
 ```
 
 **Verify topics and rates:**

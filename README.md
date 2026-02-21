@@ -1,6 +1,6 @@
 # Hoverbot - ROS 2 Mobile Robot Project
 
-**Status:** Base ROS 2 system configured ✅ | Motor control implemented ✅ | Sensor integration in progress 🚧
+**Status:** Base ROS 2 system configured ✅ | Motor control implemented ✅ | Sensors integrated ✅ | SLAM in progress 🚧
 
 A battery-powered mobile robot that currently runs on a small DC gearmotor chassis with L298N control and RPLIDAR + wheel encoders, before moving to a hoverboard drive base. Running ROS 2 Humble on Ubuntu 22.04.
 
@@ -15,7 +15,7 @@ A battery-powered mobile robot that currently runs on a small DC gearmotor chass
 - **Sensors:**
   - RPLIDAR A1 (2D lidar) - *Integrated*
   - Wheel encoders (Hall effect, 288 ticks/rev) - *Integrated*
-  - BNO055 IMU - *Planned*
+  - BNO055 IMU - *Integrated*
   - Intel RealSense D435i depth camera - *Planned*
 
 See [docs/HARDWARE.md](docs/HARDWARE.md) for complete bill of materials and specifications.
@@ -33,18 +33,22 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for complete bill of materials and spec
 - [x] Git workflow for multi-machine development
 - [x] TF tree and URDF robot description
 - [x] L298N motor controller node with encoder support
-- [x] Keyboard teleoperation node
+- [x] Keyboard teleoperation node (WASD)
+- [x] Wheel base calibration (0.236m effective)
+- [x] BNO055 IMU integration (I2C, NDOF mode, 100Hz)
+- [x] EKF sensor fusion (wheel odom + IMU)
+- [x] RPLIDAR lidar watchdog (auto motor stop/start, auto USB power cycle)
 - [x] Gazebo simulation setup
 
 ### 🚧 In Progress
-- [ ] RViz visualization
-- [ ] Hardware testing and calibration
+- [ ] SLAM map building (slam_toolbox, TF stable, testing in progress)
+- [ ] IMU calibration (BNO055 NDOF self-cal)
 
 ### 📋 Planned
-- [ ] BNO055 IMU integration
+- [ ] Save and reuse maps
+- [ ] Nav2 autonomous navigation
 - [ ] RealSense camera integration
-- [ ] SLAM and navigation
-- [ ] Autonomous behavior
+- [ ] Hoverboard motor migration
 
 See [docs/TODO.md](docs/TODO.md) for detailed roadmap.
 
@@ -124,7 +128,8 @@ my_robot_bringup/
 │   └── service_example.launch.py # Demo service node
 ├── my_robot_bringup/            # Python nodes
 │   ├── motor_controller.py      # L298N motor controller node
-│   └── teleop_keyboard.py       # Keyboard teleoperation node
+│   ├── teleop_keyboard.py       # Keyboard teleoperation node
+│   └── lidar_watchdog.py        # RPLIDAR motor stop/start + USB power cycle
 ├── urdf/                        # Robot description files
 │   ├── robot.urdf.xacro         # Main robot URDF
 │   ├── robot_core.xacro         # Core robot structure
@@ -144,7 +149,7 @@ my_robot_bringup/
 
 - **Development PC:** `dev` (set per network)
 - **Robot Computer:** `hoverbot` (192.168.86.33)
-- **ROS Domain ID:** 42
+- **ROS Domain ID:** 0 (default — do NOT set in .bashrc)
 - **Connection:** Passwordless SSH configured
 
 Both machines on same subnet (192.168.86.0/24) with hostname resolution via `/etc/hosts`.

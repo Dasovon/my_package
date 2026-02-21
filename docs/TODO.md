@@ -1,6 +1,6 @@
 # Project Roadmap and TODO List
 
-**Last Updated:** February 17, 2026
+**Last Updated:** February 20, 2026
 
 ---
 
@@ -94,10 +94,9 @@
 - [x] Add BNO055 IMU (I2C bus 1, address 0x28) -- integrated and publishing
 - [x] Add robot_localization EKF -- fusing /odom + /imu/data -> /odometry/filtered
 - [x] Save initial maps (maps/ dir: .pgm/.yaml + slam_toolbox serialized)
-- [ ] **SLAM map stable during driving** -- map froze during last test session
-  - TF ownership fixed (motor controller owns odom TF, EKF publish_tf: false)
-  - RPLIDAR has USB power instability -- needs powered USB hub
-  - Session ended before confirming fix -- test first thing next session
+- [x] RPLIDAR USB auto power cycle -- lidar_watchdog detects crashes and power cycles USB automatically (requires sudoers rule, see SESSION_NOTES.md)
+- [x] Lidar motor watchdog -- stops motor when nothing subscribed to /scan, starts when SLAM/rviz connects
+- [ ] **SLAM map stable during driving** -- TF is fixed, lidar is stable, test next session
 - [ ] Map a full room successfully
 - [ ] IMU calibration -- BNO055 gyro needs calibration (leave still 30s on startup)
 
@@ -138,9 +137,9 @@
 ## Known Issues
 
 ### To Fix
-- [ ] SLAM map freezing during driving -- likely fixed (test next session)
+- [ ] SLAM map freezing during driving -- test next session (TF and lidar now stable)
 - [x] ~~Heading drift ~10 deg over 600mm straight-line travel~~ -- fixed via wheel_base calibration (0.236m)
-- [ ] RPLIDAR USB power instability -- get powered USB hub
+- [ ] RPLIDAR USB power instability -- auto power cycle workaround added; get powered USB hub for real fix
 - [ ] Remove duplicate cmd_vel publishing in teleop (timer + immediate)
 - [ ] Calculate accurate URDF inertia values (using placeholders)
 

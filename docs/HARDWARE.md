@@ -67,7 +67,7 @@ Complete hardware specifications, wiring, motor configuration, and software depe
 - **ROS Driver:** `rplidar_ros`
 - **Frame ID:** `laser_frame`
 - **URDF orientation:** `rpy="0 0 ${pi}"` — cable faces back, 0° points away from cable, pi rotation aligns it forward. **Do not change this.**
-- **Known issue:** USB power instability causes periodic crashes. Fix: powered USB hub. Workaround: `respawn=True` in rplidar.launch.py.
+- **Known issue:** USB power instability causes periodic crashes (errors 80008000/80008002). Fix: powered USB hub. Workaround: lidar_watchdog auto power cycles USB on crash detection + `respawn=True, respawn_delay=7.0` in rplidar.launch.py.
 
 ### BNO055 - 9-Axis IMU
 - **Status:** Integrated (2026-02-17)
@@ -116,16 +116,16 @@ Physical motors are wired opposite each other. Software inversion compensates wi
 
 ### Critical Parameters
 
-**Minimum Duty Cycle: 80%** -- DG01D-E motors require high breakaway torque. Below 80%, motors won't start reliably.
+**Minimum Duty Cycle: 90%** -- DG01D-E motors require high breakaway torque. Below 90%, motors are underpowered and sluggish.
 
 **Velocity Mapping:**
 ```python
 # velocity_fraction = abs(velocity) / max_speed
 # duty = min_duty + (velocity_fraction * (max_duty - min_duty))
-# Any non-zero velocity maps to minimum 80% duty cycle
+# Any non-zero velocity maps to minimum 90% duty cycle
 ```
 
-**Ramping:** 10% duty cycle change per iteration at 50 Hz control loop (0.16s to reach 80% from 0%).
+**Ramping:** 10% duty cycle change per iteration at 50 Hz control loop (0.18s to reach 90% from 0%).
 
 ---
 
@@ -187,7 +187,7 @@ motor_controller:
     encoder_ticks_per_rev: 288     # 3 pulses x 2 edges x 48:1 gear
     max_speed: 0.5                 # Maximum linear velocity (m/s)
     max_angular_speed: 2.0         # Maximum angular velocity (rad/s)
-    min_duty_cycle: 80             # Minimum PWM for starting
+    min_duty_cycle: 90             # Minimum PWM for starting
     max_duty_cycle: 100            # Maximum PWM
     pwm_frequency: 1000            # PWM frequency (Hz)
     max_tick_delta: 1200           # Encoder tick delta clamp
