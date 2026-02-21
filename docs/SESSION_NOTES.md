@@ -328,17 +328,24 @@ Two known causes:
    - `maps/my_map.pgm` + `maps/my_map.yaml` — nav2 format
    - `maps/my_map_slam.data` + `maps/my_map_slam.posegraph` — slam_toolbox state
 
-4. **Sudoers rule for USB power cycle** — must be run once on Pi if not already done:
+4. **Nav2 setup (NEXT)** — Phase 6. Decisions to make at start of session:
+   - Where to run Nav2: dev machine (recommended, Pi already ~33% CPU) vs Pi
+   - Localization: AMCL with saved map (recommended, simpler) vs slam_toolbox localization mode
+   - Controller: Regulated Pure Pursuit (recommended for diff drive) vs DWB
+   - Nav2 is not installed yet — will need: `sudo apt install ros-humble-nav2-bringup`
+   - Need to create: `config/nav2_params.yaml`, `launch/nav2.launch.py`
+
+5. **Sudoers rule for USB power cycle** — must be run once on Pi if not already done:
    ```bash
    echo 'ryan ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/bus/usb/devices/1-1.2/authorized' | sudo tee /etc/sudoers.d/lidar-power-cycle
    ```
 
-5. **Stale process cleanup** — always kill all nodes before relaunching to avoid duplicate node issues:
+6. **Stale process cleanup** — always kill all nodes before relaunching to avoid duplicate node issues:
    ```bash
    ps aux | grep -E "rplidar_composition|motor_controller.py|bno055|ekf_node|robot_state_pub|static_transform|lidar_watchdog" | grep -v grep | awk '{print $2}' | xargs kill -9
    ```
 
-6. **Powered USB hub** — RPLIDAR still benefits from better USB power. Auto power cycle works around it but a hub is the real fix.
+7. **Powered USB hub** — RPLIDAR still benefits from better USB power. Auto power cycle works around it but a hub is the real fix.
 
 ---
 
