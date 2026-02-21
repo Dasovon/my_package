@@ -42,7 +42,7 @@ See [docs/HARDWARE.md](docs/HARDWARE.md) for complete bill of materials and spec
 - [x] Gazebo simulation setup
 
 ### 🚧 In Progress
-- [ ] Save and reuse a complete room map
+- [x] Save a complete room map (maps/my_map.*)
 - [ ] IMU calibration (BNO055 NDOF self-cal)
 
 ### 📋 Planned

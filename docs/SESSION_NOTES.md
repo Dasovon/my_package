@@ -320,11 +320,9 @@ Two known causes:
 
 2. **IMU calibration** — BNO055 gyro offsets look uncalibrated (values like 65535). The NDOF mode does self-calibration: leave robot still for ~30s for gyro cal, move in figure-8 for mag cal. Check `/imu/calib_status` topic.
 
-3. **Save a good map** — once SLAM works consistently, save with:
-   ```bash
-   ros2 run nav2_map_server map_saver_cli -f ~/robot_ws/src/my_package/maps/my_map
-   ros2 service call /slam_toolbox/save_map slam_toolbox/srv/SaveMap "{name: {data: 'my_map_slam'}}"
-   ```
+3. ~~**Save a good map**~~ — **DONE**. Saved 2026-02-20:
+   - `maps/my_map.pgm` + `maps/my_map.yaml` — nav2 format
+   - `maps/my_map_slam.data` + `maps/my_map_slam.posegraph` — slam_toolbox state
 
 4. **Sudoers rule for USB power cycle** — must be run once on Pi if not already done:
    ```bash
