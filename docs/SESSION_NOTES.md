@@ -1,5 +1,5 @@
 # Session Notes — For Future Claude Sessions
-**Last updated: 2026-02-20 (session 3)**
+**Last updated: 2026-02-21 (session 4)**
 **Read this at the start of every session. It covers everything done so far.**
 
 ---
@@ -180,11 +180,14 @@ map (published by slam_toolbox on dev machine)
 - offset_acc: [-12, -2, -34] mg | offset_mag: [-203, 228, 550] uT/16 | offset_gyr: [-1, 0, -1] dps/16
 - radius_acc: 1000 | radius_mag: 720
 
-### `my_robot_bringup/lidar_watchdog.py` (new)
+### `my_robot_bringup/lidar_watchdog.py` (updated 2026-02-21)
 - Monitors `/scan` subscriber count every 2 seconds
 - Calls `/stop_motor` when count drops to 0, `/start_motor` when count rises above 0
 - Conserves battery during coding sessions when SLAM/rviz are not running
 - Auto power cycles USB when crash detected (service goes unavailable), with 10s cooldown
+- **Startup timeout (added 2026-02-21)**: if the rplidar service never becomes available within
+  20s, triggers a power cycle. Handles the case where rplidar crashes immediately on startup
+  (timeout error) before its service is ever published — the crash detector missed this.
 - 8s grace period after startup before it will stop the motor (prevents SDK timeout)
 - Motor can also be toggled manually: `ros2 service call /stop_motor std_srvs/srv/Empty {}` / `ros2 service call /start_motor std_srvs/srv/Empty {}`
 
@@ -197,6 +200,11 @@ map (published by slam_toolbox on dev machine)
 
 ### `launch/rplidar.launch.py`
 - `respawn_delay`: 3.0 → **7.0** (allows watchdog power cycle to complete before respawn)
+
+### `config/nav2_params.yaml` (updated 2026-02-21)
+- `controller_server.FollowPath.transform_tolerance`: 0.1 → **0.5** (Pi→dev network latency)
+- `behavior_server.transform_tolerance`: 0.1 → **0.5** (same)
+- `FollowPath.regulated_linear_scaling_min_speed`: 0.25 → **0.10** (must be < desired_linear_vel 0.2, otherwise speed scaling is a no-op)
 
 ### `config/motor_controller.yaml`
 - `min_duty_cycle`: 80 → **90** (motors were underpowered)
@@ -292,6 +300,16 @@ Then restart the lidar node.
 ### RPLIDAR stuck (no "Start" message, 80%+ CPU, 0 scan publishers)
 Kill the process and power cycle USB. The SDK is stuck waiting for hardware response.
 
+### RPLIDAR timeout loop on startup (SL_RESULT_OPERATION_TIMEOUT every ~4s)
+The lidar hardware is in a bad state from the previous session. The watchdog will now auto
+power cycle after 20s. But the software authorized-toggle often doesn't fully reset the
+hardware (capacitors stay charged). **Physical unplug/replug is the reliable fix.**
+After replugging, the device may move from ttyUSBx — the by-id path handles this automatically.
+
+### Nav2 "Timed out waiting for transform from base_footprint to map"
+AMCL hasn't been given an initial pose yet. In rviz2: click **2D Pose Estimate**, click on the
+map where the robot is, drag to set heading. This unblocks everything.
+
 ### git repo corruption (empty object files)
 Happened once due to power/disk issue. Recovery:
 ```bash
@@ -328,16 +346,22 @@ Two known causes:
    - `maps/my_map.pgm` + `maps/my_map.yaml` — nav2 format
    - `maps/my_map_slam.data` + `maps/my_map_slam.posegraph` — slam_toolbox state
 
-4. **Nav2 setup (NEXT)** — Phase 6. Decisions to make at start of session:
-   - Where to run Nav2: dev machine (recommended, Pi already ~33% CPU) vs Pi
-   - Localization: AMCL with saved map (recommended, simpler) vs slam_toolbox localization mode
-   - Controller: Regulated Pure Pursuit (recommended for diff drive) vs DWB
-   - Nav2 is not installed yet — will need: `sudo apt install ros-humble-nav2-bringup`
-   - Need to create: `config/nav2_params.yaml`, `launch/nav2.launch.py`
+4. **Nav2 setup (IN PROGRESS)** — Phase 6. Config and launch files are done. Not yet tested end-to-end.
+   - `config/nav2_params.yaml` and `launch/nav2.launch.py` exist and are correct
+   - Runs on dev machine: `ros2 launch my_robot_bringup nav2.launch.py`
+   - Install on dev if not done: `sudo apt install ros-humble-navigation2 ros-humble-nav2-bringup`
+   - **AMCL requires an initial pose** — without it, AMCL won't publish `map→odom` TF and
+     Nav2 will spam "Timed out waiting for transform from base_footprint to map". Fix: in
+     rviz2, click **2D Pose Estimate**, click+drag on the map where the robot physically is.
+   - After setting initial pose, laser scan should align with map walls → localization working
+   - Then use **2D Nav Goal** to send the robot somewhere
+   - **Next session: actually drive to a goal and verify Nav2 works end-to-end**
 
-5. **Sudoers rule for USB power cycle** — must be run once on Pi if not already done:
+5. **Sudoers rule for USB power cycle** — **DONE 2026-02-21**. File exists at
+   `/etc/sudoers.d/lidar-power-cycle`. Watchdog can now auto power cycle without a TTY.
+   If it ever gets broken again (bad line breaks from copy-paste), fix with:
    ```bash
-   echo 'ryan ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/bus/usb/devices/1-1.2/authorized' | sudo tee /etc/sudoers.d/lidar-power-cycle
+   sudo python3 -c "open('/etc/sudoers.d/lidar-power-cycle','w').write('ryan ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/bus/usb/devices/1-1.2/authorized\n')"
    ```
 
 6. **Stale process cleanup** — always kill all nodes before relaunching to avoid duplicate node issues:

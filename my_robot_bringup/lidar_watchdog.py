@@ -56,6 +56,10 @@ class LidarWatchdog(Node):
         # Cooldown to avoid power cycling repeatedly in quick succession
         self._last_power_cycle = 0.0
 
+        # Startup timeout: power cycle if service never comes up within 20s
+        self._startup_time = time.monotonic()
+        self._startup_power_cycle_done = False
+
         self.create_timer(2.0, self._check)
         self.get_logger().info('Lidar watchdog started')
 
@@ -74,6 +78,15 @@ class LidarWatchdog(Node):
             self._motor_running = True
 
         self._service_was_ready = service_ready
+
+        # Startup timeout: if the service has never come up after 20s, power cycle.
+        # This handles the case where rplidar crashes immediately on startup (before
+        # its service ever becomes available), which the crash detector above misses.
+        if self._service_ready_since is None and not self._startup_power_cycle_done:
+            if time.monotonic() - self._startup_time > 20.0:
+                self.get_logger().warn('RPLIDAR failed to start in 20s — power cycling USB')
+                self._power_cycle_usb()
+                self._startup_power_cycle_done = True
 
         if not service_ready:
             return
