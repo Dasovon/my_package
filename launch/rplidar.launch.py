@@ -29,6 +29,6 @@ def generate_launch_description():
             parameters=[config],
             output='screen',
             respawn=True,
-            respawn_delay=3.0,
+            respawn_delay=7.0,
         ),
     ])
