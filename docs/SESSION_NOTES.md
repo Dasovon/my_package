@@ -1,406 +1,88 @@
-# Session Notes — For Future Claude Sessions
-**Last updated: 2026-02-22 (session 5)**
-**Read this at the start of every session. It covers everything done so far.**
+# Session Notes — Hand-off for Next Session
+**Written: 2026-02-22 (end of session 6)**
 
 ---
 
-## Current Robot State
+## What Was Done This Session
 
-The robot is a differential drive hoverbot on a Raspberry Pi 4. As of this session:
+Worked on Nav2 end-to-end navigation. Robot moves toward goals but keeps running into walls. Several bugs fixed and key problems identified.
 
-- Wheel base is calibrated (0.236m effective)
-- Both encoders are wired and working
-- BNO055 IMU is wired and initialized
-- EKF (robot_localization) is running but NOT publishing TF (motor controller owns TF)
-- RPLIDAR A1 USB instability mostly resolved via auto power cycle in lidar_watchdog
-- Motor min duty increased to 90% (motors were underpowered at 80%)
-- **SLAM WORKING** — map builds and persists while driving
-- slam.yaml tuned: resolution 0.025, smear deviation 0.03, link match response 0.45
-- **BNO055 IMU CALIBRATED** — all 3s on calib_status; offsets saved to config/bno055.yaml
+### Files Changed
+- **`launch/nav2.launch.py`** — Added local RSP + `TimerAction(period=3.0)` delay before nav2_bringup
+- **`config/nav2_params.yaml`** — progress_checker tuned (0.1m / 30s); lookahead reduced (0.4m / 0.2m / 0.6m); velocity settings at original values
+- **`config/nav2.rviz`** (new) — Pre-configured rviz2 layout for Nav2
 
 ---
 
-## Hardware
+## Current State
 
-### Robot
-- Differential drive, DG01D-E motors (1:48 gear ratio)
-- L298N dual H-bridge motor driver
-- Hall effect encoders: 3 magnets × 2 edges × 48:1 = 288 ticks/rev
-- Raspberry Pi 4 (hostname: hoverbot)
-- Dev machine (hostname: dev) for rviz/teleop/SLAM
+Nav2 is partially working:
+- Robot moves toward goals
+- AMCL localizes when scan aligns with map walls
+- But robot is still hitting walls — localization quality is the suspected root issue
+- The SLAM map has thick/scattered wall dots rather than sharp lines, which may be limiting AMCL
 
-### Calibrated Values
-- `wheel_base`: 0.236m effective (physical center-to-center is 0.165m — effective is larger due to wheel scrub)
-- `wheel_diameter`: 0.065m
-- `encoder_ticks_per_rev`: 288
-
-### GPIO Pin Assignments (BCM numbering)
-| Function | Pin |
-|---|---|
-| Motor A Enable (PWM) | 17 |
-| Motor A IN1 | 27 |
-| Motor A IN2 | 22 |
-| Motor B Enable (PWM) | 13 |
-| Motor B IN3 | 19 |
-| Motor B IN4 | 26 |
-| Left Encoder A | 23 |
-| Left Encoder B | 24 |
-| Right Encoder A | 25 |
-| Right Encoder B | 5 |
-
-**encoder_left_inverted: true, encoder_right_inverted: false**
-
-### Right Encoder Wiring (physical Pi4 header pins)
-- `+` (VCC) → 3.3V → **Physical pin 1 or 17**
-- `A` signal → GPIO 25 → **Physical pin 22**
-- `B` signal → GPIO 5 → **Physical pin 29**
-- `GND` → any ground pin
-
-**THIS WAS THE PROBLEM THIS SESSION: right encoder VCC and A pin were both disconnected. Robot thought it was always turning right because right wheel reported 0 ticks. Caused clockwise scan spin in rviz and broke SLAM.**
-
-### BNO055 IMU
-- Adafruit BNO055 on breadboard
-- I2C bus 1, address 0x28 (confirmed with i2cdetect)
-- Wiring: VIN→3.3V, GND→GND, SDA→GPIO2 (pin 3), SCL→GPIO3 (pin 5), ADR floating
-- Mounted at robot center (base_link), frame_id: `imu_link`
-- Static TF published: `base_link` → `imu_link` (0,0,0 offset, identity rotation)
-- Config: `config/bno055.yaml`
-
-### RPLIDAR A1
-- Connected via USB → CP2102 USB-UART bridge
-- **USE THE BY-ID PATH, NOT ttyUSBx** — the port number changes every power cycle:
-  `/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0`
-- Cable faces the **back** of the robot
-- URDF has `rpy="0 0 ${pi}"` — this is **CORRECT**. The A1's 0° points away from the cable, so pi rotation aligns it forward. Verified empirically: object placed in front of robot appears in front in rviz.
-- Scan mode: Standard (2kHz, 10Hz). Sensitivity mode (8kHz) was tried but caused buffer overflow crashes.
-- Config: `config/rplidar.yaml`
-
-**RPLIDAR INSTABILITY ISSUE**: The lidar repeatedly enters bad states (health error 80008002, buffer overflow, or stuck at 84% CPU with 0 scan publishers). Root cause suspected: insufficient USB current from Pi. Symptoms:
-  - Health error 80008002 → power cycle USB
-  - Buffer overflow crash → stale process on wrong port (check `lsof /dev/ttyUSBx`)
-  - Two processes fighting over port → kill both, restart one
-  - Stuck process (no "Start" message) → `kill -9 <pid>` then power cycle USB
-  - **Fix added**: `respawn=True, respawn_delay=7.0` in rplidar.launch.py so it auto-restarts
-  - **Fix added**: lidar_watchdog auto power cycles USB on crash (see sudoers setup below)
-  - **Long term fix needed**: powered USB hub
-
-**RPLIDAR USB AUTO POWER CYCLE**: lidar_watchdog detects crashes and power cycles `/sys/bus/usb/devices/1-1.2/authorized`. Requires one-time sudoers setup on Pi:
+**Pi bringup** should be running on the Pi. Check before starting:
 ```bash
-echo 'ryan ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/bus/usb/devices/1-1.2/authorized' | sudo tee /etc/sudoers.d/lidar-power-cycle
+ssh ryan@192.168.86.33 "ps aux | grep -E 'motor_controller|rplidar_composition' | grep -v grep"
 ```
-Without this, watchdog logs an error with the fix instructions. The power cycle has a 10s cooldown to prevent loops.
 
 ---
 
-## Software Architecture
+## Key Problems Found This Session
 
-### ROS 2 Humble on Pi
-Nodes launched by `full_bringup.launch.py`:
-1. **robot_state_publisher** — publishes TF from URDF (base_footprint→base_link→laser_frame etc.)
-2. **motor_controller** — wheel odometry, publishes `/odom` and `odom→base_footprint` TF
-3. **rplidar_composition** — publishes `/scan`
-4. **bno055** — publishes `/imu/data`, `/imu/imu_raw`, etc.
-5. **static_transform_publisher** — `base_link` → `imu_link` (0,0,0)
-6. **ekf_node** — fuses `/odom` + `/imu/data` → `/odometry/filtered`
-7. **lidar_watchdog** — stops RPLIDAR motor when `/scan` has no subscribers, restarts when a subscriber appears; auto power cycles USB on crash
+### Fast DDS cross-machine /tf_static unreliable
+Pi's RSP publishes `base_footprint→base_link` and `base_link→laser_frame` to `/tf_static` with TRANSIENT_LOCAL. Despite the QoS guarantee, AMCL on dev machine was silently not receiving these. **Fix already applied**: nav2.launch.py now runs a second RSP locally on dev machine.
 
-### TF Tree
-```
-map (published by slam_toolbox on dev machine)
-└── odom (published by motor_controller via TF broadcaster)
-    └── base_footprint
-        └── base_link
-            ├── laser_frame (from URDF)
-            └── imu_link (static TF)
-```
+### AMCL silently drops all scans if odom→base_footprint TF is missing
+If `motor_controller` crashes on Pi, AMCL's MessageFilter drops every scan — no error logged on dev side. Scan topic shows data in rviz but AMCL doesn't update. **Always check motor_controller is alive if AMCL seems stuck.**
 
-### EKF Configuration (current)
-- `publish_tf: false` — motor controller owns odom→base_footprint TF
-- `frequency: 30.0` Hz
-- Fuses: wheel odom (x, y, yaw, vx, vyaw) + IMU (vyaw, ax)
-- `imu0_relative: true` — don't use absolute orientation (magnetometer unreliable indoors)
-- `imu0_remove_gravitational_acceleration: true`
-- Config: `config/ekf.yaml`
-
-**WHY EKF DOESN'T OWN TF**: When EKF published TF (`publish_tf: true`), it caused TF gaps that froze SLAM. The EKF at 30Hz on the Pi occasionally takes 200ms to process, creating gaps. Motor controller TF is event-driven (encoder interrupts) and never gaps. So motor controller publishes TF, EKF just publishes `/odometry/filtered` for reference.
-
-### SLAM
-- slam_toolbox online async mode
-- Runs on **dev machine**, subscribes to `/scan` and TF from Pi over network
-- Launch: `ros2 launch my_robot_bringup slam.launch.py` (wraps slam_toolbox with our params)
-- Config: `config/slam.yaml`
-- Key params: `base_frame: base_footprint`, `transform_timeout: 0.5`, `minimum_travel_distance: 0.2`
-
-**SLAM STATUS: WORKING**. Map builds and persists while driving. Tuned for better quality — thinner walls, finer resolution.
-
-**rviz2 tip**: To reduce LaserScan dot size → click LaserScan display → **Size (m)**: `0.02`, **Style**: `Points`.
-
----
-
-## Key Files and What Changed
-
-### `my_robot_bringup/motor_controller.py`
-- `wheel_base` default: 0.165 → **0.236**
-- `velocity_to_duty()`: added `min(..., 1.0)` clamp to prevent duty cycle > 100% (was crashing with ValueError when wheel_base increased)
-- Added `publish_odom_tf` parameter (default True). TF broadcast is gated on it:
-  ```python
-  self.declare_parameter('publish_odom_tf', True)
-  self.publish_odom_tf = self.get_parameter('publish_odom_tf').value
-  # In publish_odometry():
-  if self.publish_odom_tf:
-      self.tf_broadcaster.sendTransform(t)
-  ```
-
-### `config/motor_controller.yaml`
-- `wheel_base: 0.236` (was 0.165)
-
-### `config/rplidar.yaml`
-- `serial_port`: changed to stable by-id path (not ttyUSB0/1/2)
-- `scan_mode: Standard`
-
-### `config/slam.yaml`
-- `minimum_travel_distance: 0.2` (was 0.5)
-- `minimum_travel_heading: 0.25` (was 0.5)
-- `transform_timeout: 0.5` (was 0.2)
-- `resolution: 0.025` (was 0.05) — finer map grid
-- `link_match_minimum_response_fine: 0.45` (was 0.1) — only high-quality scans accepted
-- `correlation_search_space_smear_deviation: 0.03` (was 0.1) — less wall smearing
-
-### `config/ekf.yaml` (new)
-- Fuses /odom + /imu/data
-- `publish_tf: false` (motor controller owns TF)
-- `frequency: 30.0`
-
-### `config/bno055.yaml` (new)
-- i2c_bus: 1, i2c_addr: 0x28
-- operation_mode: 0x0C (NDOF)
-- ros_topic_prefix: "imu/"
-- data_query_frequency: 100
-- `set_offsets: true` — calibration offsets saved and loaded on startup
-- offset_acc: [-12, -2, -34] mg | offset_mag: [-203, 228, 550] uT/16 | offset_gyr: [-1, 0, -1] dps/16
-- radius_acc: 1000 | radius_mag: 720
-
-### `my_robot_bringup/lidar_watchdog.py` (updated 2026-02-21)
-- Monitors `/scan` subscriber count every 2 seconds
-- Calls `/stop_motor` when count drops to 0, `/start_motor` when count rises above 0
-- Conserves battery during coding sessions when SLAM/rviz are not running
-- Auto power cycles USB when crash detected (service goes unavailable), with 10s cooldown
-- **Startup timeout (added 2026-02-21)**: if the rplidar service never becomes available within
-  20s, triggers a power cycle. Handles the case where rplidar crashes immediately on startup
-  (timeout error) before its service is ever published — the crash detector missed this.
-- 8s grace period after startup before it will stop the motor (prevents SDK timeout)
-- Motor can also be toggled manually: `ros2 service call /stop_motor std_srvs/srv/Empty {}` / `ros2 service call /start_motor std_srvs/srv/Empty {}`
-
-### `launch/full_bringup.launch.py`
-- Added BNO055 node
-- Added static TF publisher (base_link → imu_link)
-- Added EKF node
-- Motor controller launched with `publish_odom_tf: true`
-- Added lidar_watchdog node
-
-### `launch/rplidar.launch.py`
-- `respawn_delay`: 3.0 → **7.0** (allows watchdog power cycle to complete before respawn)
-
-### `config/nav2_params.yaml` (updated 2026-02-21)
-- `controller_server.FollowPath.transform_tolerance`: 0.1 → **0.5** (Pi→dev network latency)
-- `behavior_server.transform_tolerance`: 0.1 → **0.5** (same)
-- `FollowPath.regulated_linear_scaling_min_speed`: 0.25 → **0.10** (must be < desired_linear_vel 0.2, otherwise speed scaling is a no-op)
-
-### `config/motor_controller.yaml`
-- `min_duty_cycle`: 80 → **90** (motors were underpowered)
-
-### `launch/motor_control.launch.py`
-- Added `publish_odom_tf` launch argument (default 'true'), passed to node parameters
-
-### `launch/rplidar.launch.py`
-- Added `respawn=True, respawn_delay=3.0`
-
-### `launch/slam.launch.py` (new)
-- Wraps `slam_toolbox online_async_launch.py` with our `config/slam.yaml`
-- Use this instead of typing the long slam_toolbox command
-
-### `scripts/calibrate_wheel_base.py` (new)
-- Spins robot for 20 seconds, user counts rotations
-- Calculates effective wheel_base from ratio of expected vs actual rotations
-
-### `maps/`
-- `my_map.pgm` + `my_map.yaml` — nav2 format map
-- `my_map_slam.data` + `my_map_slam.posegraph` — slam_toolbox serialized state
-
----
-
-## Build and Launch
-
-### On Pi (hoverbot)
+### Motor controller holds last velocity when /cmd_vel goes silent
+No timeout to zero. When Nav2 is killed mid-navigation, motors keep running. **To stop robot:**
 ```bash
-cd ~/robot_ws && colcon build --packages-select my_robot_bringup --base-paths src/my_package
-source ~/robot_ws/install/setup.bash
-ros2 launch my_robot_bringup full_bringup.launch.py
+ssh ryan@192.168.86.33 "source ~/robot_ws/install/setup.bash && ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.0}, angular: {z: 0.0}}'"
+```
+Kill that publisher when you want Nav2 to take back control.
+
+### RPLIDAR spawns 3 processes on same serial port
+Happens when respawn fires before the crashed process releases the port. Check with:
+```bash
+ssh ryan@192.168.86.33 "lsof /dev/ttyUSB0"
+```
+Kill all but the newest PID. Happened twice this session.
+
+---
+
+## How to Start Next Session
+
+1. **On Pi** — ensure bringup is running (or restart it):
+```bash
+ssh ryan@192.168.86.33 "source ~/robot_ws/install/setup.bash && nohup ros2 launch my_robot_bringup full_bringup.launch.py > /tmp/bringup.log 2>&1 &"
 ```
 
-### On Dev Machine
+2. **On dev** — pull, build, launch Nav2:
 ```bash
-cd ~/dev_ws/src/my_package && git pull origin main
+cd ~/dev_ws/src/my_package && git pull origin master
 cd ~/dev_ws && colcon build --packages-select my_robot_bringup
 source ~/dev_ws/install/setup.bash
-
-# SLAM
-ros2 launch my_robot_bringup slam.launch.py
-
-# Teleop
-ros2 run teleop_twist_keyboard teleop_twist_keyboard
+nohup ros2 launch my_robot_bringup nav2.launch.py > /tmp/nav2.log 2>&1 &
+rviz2 -d ~/dev_ws/src/my_package/config/nav2.rviz
 ```
 
-### rviz Setup for SLAM
-- Fixed Frame: `map`
-- Add: **Map** → `/map`
-- Add: **LaserScan** → `/scan`
-- Add: **RobotModel**
+3. **In rviz2** — use **2D Pose Estimate** to set robot's location on the map. Verify scan lines align with black wall dots before sending any goal.
+
+4. **Check RPLIDAR** — only one `rplidar_composition` process should be running on Pi.
 
 ---
 
-## Network
-- Both machines: `ROS_DOMAIN_ID=0` (default)
-- Dev machine previously had `ROS_DOMAIN_ID=42` in `~/.bashrc` — was removed 2026-02-12
-- If rviz sees no topics: check `echo $ROS_DOMAIN_ID` on both machines
+## What To Work On Next
 
----
+1. **Get a clean Nav2 run** — robot must reach a goal without hitting a wall
+   - Set pose estimate carefully, wait for particles to converge, then send a conservative goal
+   - Consider using the Nav2 Goal button in rviz2 rather than command line so you can pick a visible open area
 
-## Common Problems and Fixes
+2. **Consider re-mapping** — if AMCL localization stays poor, do a fresh SLAM run to get a cleaner map with sharper wall lines
 
-### `rclpy.ok()` error on `ros2 topic list`
-ROS 2 daemon crashed. Fix:
-```bash
-ros2 daemon stop && ros2 daemon start
-```
+3. **Motor controller velocity timeout** — add a ~1s timeout to zero if no cmd_vel received (prevents motors running when Nav2 is killed)
 
-### Multiple duplicate nodes (motor_controller x3, bno055 x3, etc.)
-Caused by partial relaunches stacking. Every bringup attempt that wasn't fully killed left orphan processes. Fix:
-```bash
-ps aux | grep -E "ros2|rplidar_composition|motor_controller.py|bno055|ekf_node|robot_state_pub|static_transform" | grep -v grep | awk '{print $2}' | xargs kill -9
-```
-Then relaunch once.
-
-### RPLIDAR health error 80008002 / 80008000 / 80008001
-The lidar_watchdog auto power cycles USB when it detects a crash — no manual action needed if the sudoers rule is set up. If not set up, the watchdog logs the fix command.
-
-Manual power cycle:
-```bash
-echo '0' | sudo tee /sys/bus/usb/devices/1-1.2/authorized && sleep 2 && echo '1' | sudo tee /sys/bus/usb/devices/1-1.2/authorized
-```
-The device may also move from ttyUSB0 → ttyUSB1 → ttyUSB2 after each cycle — the by-id path handles this automatically.
-
-### RPLIDAR buffer overflow / 2 processes on same port
-```bash
-lsof /dev/ttyUSBx   # find conflicting PIDs
-kill -9 <pid1> <pid2>
-```
-Then restart the lidar node.
-
-### RPLIDAR stuck (no "Start" message, 80%+ CPU, 0 scan publishers)
-Kill the process and power cycle USB. The SDK is stuck waiting for hardware response.
-
-### RPLIDAR timeout loop on startup (SL_RESULT_OPERATION_TIMEOUT every ~4s)
-The lidar hardware is in a bad state from the previous session. The watchdog will now auto
-power cycle after 20s. But the software authorized-toggle often doesn't fully reset the
-hardware (capacitors stay charged). **Physical unplug/replug is the reliable fix.**
-After replugging, the device may move from ttyUSBx — the by-id path handles this automatically.
-
-### Nav2 "Timed out waiting for transform from base_footprint to map"
-AMCL hasn't been given an initial pose yet. In rviz2: click **2D Pose Estimate**, click on the
-map where the robot is, drag to set heading. This unblocks everything.
-
-### git repo corruption (empty object files)
-Happened once due to power/disk issue. Recovery:
-```bash
-find .git/objects -size 0 -delete
-git fetch origin  # may fail if corrupt objects were local commits
-# If it fails, do the fresh clone approach:
-git clone <remote> fresh_copy
-# copy your files over, commit, push, swap directories
-```
-
-### Wheel base calibration method
-Run `scripts/calibrate_wheel_base.py` — robot spins for 20 seconds, user counts full rotations.
-Formula: `new_wheel_base = old_wheel_base × (reported_angle / actual_angle)`
-Result: 0.165m physical → 0.236m effective (larger due to wheel scrub on floor)
-
-### Encoder not working (0.0 position forever)
-Check `/joint_states` topic — if right_wheel_joint stays at 0.0 while left accumulates, right encoder is dead.
-Most likely cause: VCC wire disconnected. Right encoder VCC → Pi 3.3V (physical pin 1 or 17).
-
-### SLAM map freezing / "no transform from" errors
-Two known causes:
-1. **EKF publishing TF with gaps** → Set `publish_tf: false` in ekf.yaml, let motor controller own TF
-2. **Multiple node instances** → Kill everything and relaunch once clean
-
----
-
-## Session 5 Notes (2026-02-22)
-
-### Claude Code now runs on dev machine
-- **Claude Code will be invoked from `ryan@dev:~/dev_ws`** going forward
-- Dev machine: `ryan@192.168.86.52`
-- Pi accessed via SSH: `ssh ryan@192.168.86.33`
-
-### SSH key auth set up (bidirectional)
-- Pi → Dev: Pi's existing key (`~/.ssh/id_ed25519`) added to dev's `~/.ssh/authorized_keys`
-  (served key over HTTP from Pi using `python3 -m http.server 9999`, fetched with curl on dev)
-- Dev → Pi: Dev's existing key (`~/.ssh/id_ed25519`) fetched via SSH and added to Pi's `~/.ssh/authorized_keys`
-- Both directions tested and working with no password prompt
-
-### CLAUDE.md created
-- Added `CLAUDE.md` to repo root (`src/my_package/CLAUDE.md`)
-- Contains session protocol, hardware reference, key files, TF tree, build/launch commands, and troubleshooting
-- Updated to reflect Claude running on dev machine (SSH commands for Pi operations)
-- Committed and pushed to `Dasovon/my_package` main
-
----
-
-## What's Left (Next Session)
-
-1. ~~**Test SLAM properly**~~ — **DONE**. SLAM working, map builds and persists.
-
-2. ~~**IMU calibration**~~ — **DONE 2026-02-20**. Achieved all 3s on calib_status. Offsets saved to `config/bno055.yaml` (`set_offsets: true`). Robot starts calibrated from now on.
-
-3. ~~**Save a good map**~~ — **DONE**. Saved 2026-02-20:
-   - `maps/my_map.pgm` + `maps/my_map.yaml` — nav2 format
-   - `maps/my_map_slam.data` + `maps/my_map_slam.posegraph` — slam_toolbox state
-
-4. **Nav2 setup (IN PROGRESS)** — Phase 6. Config and launch files are done. Not yet tested end-to-end.
-   - `config/nav2_params.yaml` and `launch/nav2.launch.py` exist and are correct
-   - Runs on dev machine: `ros2 launch my_robot_bringup nav2.launch.py`
-   - Install on dev if not done: `sudo apt install ros-humble-navigation2 ros-humble-nav2-bringup`
-   - **AMCL requires an initial pose** — without it, AMCL won't publish `map→odom` TF and
-     Nav2 will spam "Timed out waiting for transform from base_footprint to map". Fix: in
-     rviz2, click **2D Pose Estimate**, click+drag on the map where the robot physically is.
-   - After setting initial pose, laser scan should align with map walls → localization working
-   - Then use **2D Nav Goal** to send the robot somewhere
-   - **Next session: actually drive to a goal and verify Nav2 works end-to-end**
-
-5. **Sudoers rule for USB power cycle** — **DONE 2026-02-21**. File exists at
-   `/etc/sudoers.d/lidar-power-cycle`. Watchdog can now auto power cycle without a TTY.
-   If it ever gets broken again (bad line breaks from copy-paste), fix with:
-   ```bash
-   sudo python3 -c "open('/etc/sudoers.d/lidar-power-cycle','w').write('ryan ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/bus/usb/devices/1-1.2/authorized\n')"
-   ```
-
-6. **Stale process cleanup** — always kill all nodes before relaunching to avoid duplicate node issues:
-   ```bash
-   ps aux | grep -E "rplidar_composition|motor_controller.py|bno055|ekf_node|robot_state_pub|static_transform|lidar_watchdog" | grep -v grep | awk '{print $2}' | xargs kill -9
-   ```
-
-7. **Powered USB hub** — RPLIDAR still benefits from better USB power. Auto power cycle works around it but a hub is the real fix.
-
----
-
-## Installed Packages (Pi)
-```bash
-sudo apt install ros-humble-robot-localization
-sudo apt install ros-humble-bno055
-```
-
-## Installed Packages (Dev)
-```bash
-sudo apt install ros-humble-slam-toolbox
-```
+4. **Reconcile git branches** — dev is on `master`, Pi/remote main branch is `main`. Merge or rebase.
