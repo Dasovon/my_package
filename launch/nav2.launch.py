@@ -22,7 +22,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
@@ -32,6 +32,16 @@ def generate_launch_description():
 
     map_file = os.path.join(pkg_dir, 'maps', 'my_map.yaml')
     params_file = os.path.join(pkg_dir, 'config', 'nav2_params.yaml')
+
+    # Run RSP locally on the dev machine so static TFs (base_footprint→base_link,
+    # base_link→laser_frame) are published here. Without this, Fast DDS cross-machine
+    # transient_local delivery is unreliable and AMCL silently drops all scans.
+    rsp_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_dir, 'launch', 'rsp.launch.py')
+        ),
+        launch_arguments={'use_sim_time': 'false'}.items(),
+    )
 
     nav2_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -44,4 +54,10 @@ def generate_launch_description():
         }.items(),
     )
 
-    return LaunchDescription([nav2_launch])
+    # Delay nav2_bringup by 3s so RSP's /tf_static is published before
+    # AMCL processes its first scan. Without this delay AMCL silently fails
+    # the TF lookup on the first scan and gets stuck.
+    return LaunchDescription([
+        rsp_launch,
+        TimerAction(period=3.0, actions=[nav2_launch]),
+    ])

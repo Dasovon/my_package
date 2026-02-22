@@ -336,6 +336,79 @@ Two known causes:
 
 ---
 
+## Session 6 Notes (2026-02-22) — Nav2 Debugging
+
+### Files Changed This Session
+
+**`launch/nav2.launch.py`** — Added local RSP + TimerAction delay:
+- Added `robot_state_publisher` running locally on dev machine (fixes Fast DDS cross-machine `/tf_static` delivery — see below)
+- Added `TimerAction(period=3.0)` delaying nav2_bringup so RSP publishes `/tf_static` before AMCL sees first scan
+
+**`config/nav2_params.yaml`** — Several changes:
+- `progress_checker.required_movement_radius`: 0.5 → **0.1** (robot was slow, kept triggering progress failure)
+- `progress_checker.movement_time_allowance`: 10.0 → **30.0** (same reason)
+- `FollowPath.lookahead_dist`: 0.6 → **0.4** (smaller room, shorter lookahead)
+- `FollowPath.min_lookahead_dist`: 0.3 → **0.2**
+- `FollowPath.max_lookahead_dist`: 0.9 → **0.6**
+- All velocity settings restored to original (0.2 m/s, 1.8 rad/s angular, smoother 0.26 m/s)
+
+**`config/nav2.rviz`** (new) — Pre-configured rviz2 layout for Nav2:
+- Fixed Frame: `map`
+- Map display with **Durability: Transient Local** (required — map_server publishes TRANSIENT_LOCAL)
+- LaserScan with **Reliability: Best Effort** (matches rplidar publisher)
+- AMCL Particles display
+- RobotModel display
+- 2D Pose Estimate and Nav2 Goal tools in toolbar
+- Launch with: `rviz2 -d ~/dev_ws/src/my_package/config/nav2.rviz`
+
+### Key Discoveries This Session
+
+**Fast DDS cross-machine `/tf_static` delivery is unreliable:**
+The Pi's `robot_state_publisher` publishes `base_footprint→base_link` and `base_link→laser_frame` to `/tf_static` with TRANSIENT_LOCAL QoS. Despite TRANSIENT_LOCAL guaranteeing late-joining subscribers get the data, Fast DDS cross-machine delivery was silently failing — AMCL on the dev machine never received these static TFs. Fix: run a second RSP locally on the dev machine in `nav2.launch.py`. RSP is stateless (just reads URDF), so running it on both machines is safe.
+
+**AMCL silently drops ALL scans if odom→base_footprint TF is missing:**
+AMCL uses `tf2_ros::MessageFilter` which requires the full `laser_frame→odom` TF chain before passing any scan to the particle filter. If `motor_controller` crashes on the Pi (silently — no error logged on dev side), `odom→base_footprint` stops publishing and AMCL processes zero scans. Symptoms: scan lines appear in rviz (topic is publishing) but AMCL doesn't update. Fix: restart Pi bringup. **Always check motor_controller process on Pi if AMCL seems stuck.**
+
+**Motor controller holds last velocity command when /cmd_vel goes silent:**
+When Nav2 is killed mid-navigation, the last non-zero velocity command stays active — the motor controller has no timeout to zero. To stop the robot: publish zero velocity from the Pi directly:
+```bash
+ssh ryan@192.168.86.33 "source ~/robot_ws/install/setup.bash && ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.0}, angular: {z: 0.0}}' &"
+```
+Kill that publisher when you want Nav2 to take control again.
+
+**RPLIDAR repeatedly spawns 3 processes fighting over the same serial port:**
+The launch file's `respawn=True` restarts rplidar on crash, but old crashed processes don't always release the port. Result: 3 `rplidar_composition` processes all holding `/dev/ttyUSBx` simultaneously — corrupted scan data. Check with `lsof` and kill all but the newest PID. This happened twice this session.
+
+**Map display in rviz2 requires Transient Local durability:**
+Adding a Map display in rviz2 and leaving QoS at default (Volatile) results in a blank map — no walls shown. Must set **Durability Policy: Transient Local** to receive the map. The new `config/nav2.rviz` has this pre-set.
+
+**LaserScan display needs Best Effort reliability:**
+rplidar publishes with RELIABLE/VOLATILE. rviz2's default LaserScan display uses RELIABLE — this actually works, but setting to BEST_EFFORT avoids QoS warning and is more appropriate.
+
+### Nav2 End-to-End Status
+
+- Robot moved toward goals multiple times but ran into walls on each attempt
+- AMCL localization works when scan aligns with map walls, but alignment is sensitive
+- Two root causes of wall collisions so far:
+  1. Global localization gave ±83° yaw uncertainty → robot drove in wrong direction
+  2. AMCL pose still converging when goal was sent → path planned from wrong start
+- **Scan-to-wall alignment is critical** — must visually verify in rviz before sending any goal
+- The SLAM map has somewhat scattered/thick wall dots rather than sharp lines — may be limiting AMCL quality
+
+### What's Left (Priority Order)
+
+1. **Complete Nav2 end-to-end** — robot needs to reach a goal without hitting a wall
+   - Always set 2D Pose Estimate manually (not global localization) for reliable starting pose
+   - Wait for AMCL particles to visually converge (tight cluster) before sending goal
+   - Use `rviz2 -d ~/dev_ws/src/my_package/config/nav2.rviz` for pre-configured display
+   - Consider remapping a better SLAM map (thinner walls) if localization stays poor
+
+2. **Motor controller velocity timeout** — add a timeout to zero velocity if no cmd_vel received for >1s (prevents motors running when Nav2 is killed)
+
+3. **Powered USB hub** — RPLIDAR still benefits from better USB power
+
+---
+
 ## Session 5 Notes (2026-02-22)
 
 ### Claude Code now runs on dev machine

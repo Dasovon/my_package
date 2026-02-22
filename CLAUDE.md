@@ -39,8 +39,8 @@ ssh ryan@192.168.86.33 "<command>"
 
 - Phases 1–5 complete: motors, encoders, RPLIDAR, IMU, SLAM all working
 - Map saved: `maps/my_map.*`
-- **Phase 6 (Nav2) in progress** — config and launch files exist, not yet tested end-to-end
-- Next task: drive to a Nav2 goal and verify end-to-end
+- **Phase 6 (Nav2) in progress** — robot moves toward goals but still running into walls
+- Next task: achieve successful end-to-end Nav2 goal (robot reaches goal without collision)
 
 ---
 
@@ -78,12 +78,13 @@ ssh ryan@192.168.86.33 "<command>"
 | `my_robot_bringup/lidar_watchdog.py` | Monitors `/scan`, stops/starts lidar motor, auto power cycles USB on crash |
 | `launch/full_bringup.launch.py` | Launches all Pi nodes (RSP, motor, lidar, IMU, EKF, watchdog) |
 | `launch/slam.launch.py` | Wraps slam_toolbox with `config/slam.yaml` (run on dev machine) |
-| `launch/nav2.launch.py` | Nav2 bringup (run on dev machine) |
+| `launch/nav2.launch.py` | Nav2 bringup + local RSP + 3s delay (run on dev machine) |
 | `config/motor_controller.yaml` | Motor/encoder params, `min_duty_cycle: 90`, `wheel_base: 0.236` |
 | `config/slam.yaml` | SLAM params (resolution 0.025, conservative quality settings) |
 | `config/ekf.yaml` | EKF: fuses `/odom` + `/imu/data`, `publish_tf: false` |
 | `config/bno055.yaml` | IMU config + calibration offsets (loaded on startup) |
-| `config/nav2_params.yaml` | Nav2 params (transform_tolerance: 0.5 for network latency) |
+| `config/nav2_params.yaml` | Nav2 params (transform_tolerance: 0.5, lookahead 0.4m, progress_checker 0.1m/30s) |
+| `config/nav2.rviz` | Pre-configured rviz2 layout for Nav2 (correct QoS settings pre-set) |
 | `maps/my_map.*` | Saved map (nav2 + slam_toolbox formats) |
 
 ---
@@ -123,6 +124,7 @@ cd ~/dev_ws && colcon build --packages-select my_robot_bringup
 source ~/dev_ws/install/setup.bash
 ros2 launch my_robot_bringup slam.launch.py       # SLAM
 ros2 launch my_robot_bringup nav2.launch.py       # Nav2
+rviz2 -d ~/dev_ws/src/my_package/config/nav2.rviz # rviz2 with Nav2 layout pre-configured
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
@@ -162,6 +164,33 @@ Right encoder VCC → Pi 3.3V (physical pin 1 or 17).
 
 ### Nav2 "Timed out waiting for transform from base_footprint to map"
 AMCL needs an initial pose. In rviz2: **2D Pose Estimate** → click+drag on map.
+Use `rviz2 -d ~/dev_ws/src/my_package/config/nav2.rviz` — Map display is pre-set with Transient Local durability so walls appear automatically.
+
+### AMCL receives pose but scan lines don't appear / map→odom TF never published
+Root cause: `motor_controller` crashed on Pi — `odom→base_footprint` TF not publishing.
+AMCL's MessageFilter silently drops all scans if TF chain is broken.
+Fix: check and restart Pi bringup:
+```bash
+ssh ryan@192.168.86.33 "ps aux | grep motor_controller | grep -v grep"
+# If missing, restart bringup on Pi
+```
+
+### Robot keeps moving after Nav2 is killed
+Motor controller holds last velocity command indefinitely (no timeout). Stop with:
+```bash
+ssh ryan@192.168.86.33 "source ~/robot_ws/install/setup.bash && ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.0}, angular: {z: 0.0}}'"
+```
+Kill that publisher when you want Nav2 to take back control.
+
+### RPLIDAR spawns 3 processes fighting over serial port
+Check: `ssh ryan@192.168.86.33 "lsof /dev/ttyUSB0"` — if 3 PIDs shown, kill the 2 oldest:
+```bash
+ssh ryan@192.168.86.33 "kill -9 <pid1> <pid2>"  # keep newest PID only
+```
+
+### Map display blank in rviz2 (no walls)
+rviz2 Map display must have **Durability Policy: Transient Local** — default Volatile won't receive the map.
+The pre-configured `config/nav2.rviz` has this set correctly.
 
 ### SLAM map freezing / "no transform from" errors
 1. EKF publishing TF with gaps → ensure `publish_tf: false` in `config/ekf.yaml`
