@@ -2,23 +2,40 @@
 
 **Robot:** Differential drive hoverbot on Raspberry Pi 4 (hostname: `hoverbot`, IP: 192.168.86.33)
 **Stack:** ROS 2 Humble, Ubuntu 22.04 arm64
-**Package:** `src/my_package` (GitHub: `Dasovon/my_package`)
-**Session notes:** `src/my_package/docs/SESSION_NOTES.md` — read for full history
+**Package:** `~/dev_ws/src/my_package` on dev machine (GitHub: `Dasovon/my_package`)
+**Session notes:** `~/dev_ws/src/my_package/docs/SESSION_NOTES.md` — read for full history
 
 ---
 
 ## Session Protocol
 
 **At the start of every session:**
-- Read `src/my_package/docs/SESSION_NOTES.md` in full before doing anything else.
+- Read `~/dev_ws/src/my_package/docs/SESSION_NOTES.md` in full before doing anything else.
 
 **At the end of every session:**
-- Update `src/my_package/docs/SESSION_NOTES.md` with what was done, what changed, any new problems/fixes discovered, and what's left for next session.
+- Update `~/dev_ws/src/my_package/docs/SESSION_NOTES.md` with what was done, what changed, any new problems/fixes discovered, and what's left for next session.
 - Update this file (`CLAUDE.md`) to reflect any changes to hardware, key files, build steps, or common fixes.
+- Commit and push both files.
 
 ---
 
-## Project Status (as of 2026-02-21)
+## Environment
+
+**Claude Code runs on the dev machine** (`ryan@192.168.86.52`, `~/dev_ws`).
+
+- Dev workspace: `~/dev_ws/src/my_package`
+- Pi is accessed via SSH: `ssh ryan@192.168.86.33`
+- Bidirectional SSH key auth is set up (no password needed in either direction)
+- ROS_DOMAIN_ID=0 on both machines
+
+To run commands on the Pi from dev:
+```bash
+ssh ryan@192.168.86.33 "<command>"
+```
+
+---
+
+## Project Status (as of 2026-02-22)
 
 - Phases 1–5 complete: motors, encoders, RPLIDAR, IMU, SLAM all working
 - Map saved: `maps/my_map.*`
@@ -88,16 +105,15 @@ map  ← slam_toolbox (dev machine)
 
 ## Build and Launch
 
-### On Pi (hoverbot)
+### On Pi (via SSH from dev)
 ```bash
-cd ~/robot_ws && colcon build --packages-select my_robot_bringup --base-paths src/my_package
-source ~/robot_ws/install/setup.bash
-ros2 launch my_robot_bringup full_bringup.launch.py
+ssh ryan@192.168.86.33 "cd ~/robot_ws && colcon build --packages-select my_robot_bringup --base-paths src/my_package && source ~/robot_ws/install/setup.bash"
+ssh ryan@192.168.86.33 "source ~/robot_ws/install/setup.bash && ros2 launch my_robot_bringup full_bringup.launch.py"
 ```
 
-**Kill stale nodes before relaunch:**
+**Kill stale nodes on Pi:**
 ```bash
-ps aux | grep -E "rplidar_composition|motor_controller.py|bno055|ekf_node|robot_state_pub|static_transform|lidar_watchdog" | grep -v grep | awk '{print $2}' | xargs kill -9
+ssh ryan@192.168.86.33 "ps aux | grep -E 'rplidar_composition|motor_controller.py|bno055|ekf_node|robot_state_pub|static_transform|lidar_watchdog' | grep -v grep | awk '{print \$2}' | xargs kill -9"
 ```
 
 ### On Dev Machine
@@ -122,11 +138,11 @@ ros2 daemon stop && ros2 daemon start
 ```
 
 ### RPLIDAR health error (80008002, 80008000, 80008001)
-Lidar watchdog auto power cycles USB if sudoers rule is in place. Manual power cycle:
+Lidar watchdog auto power cycles USB if sudoers rule is in place. Manual power cycle (from dev):
 ```bash
-echo '0' | sudo tee /sys/bus/usb/devices/1-1.2/authorized && sleep 2 && echo '1' | sudo tee /sys/bus/usb/devices/1-1.2/authorized
+ssh ryan@192.168.86.33 "echo '0' | sudo tee /sys/bus/usb/devices/1-1.2/authorized && sleep 2 && echo '1' | sudo tee /sys/bus/usb/devices/1-1.2/authorized"
 ```
-If sudoers rule is missing:
+If sudoers rule is missing (run on Pi):
 ```bash
 sudo python3 -c "open('/etc/sudoers.d/lidar-power-cycle','w').write('ryan ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/bus/usb/devices/1-1.2/authorized\n')"
 ```
@@ -136,8 +152,8 @@ Software authorized-toggle may not fully reset hardware. **Physical unplug/replu
 
 ### RPLIDAR 2 processes on same port
 ```bash
-lsof /dev/ttyUSBx   # find conflicting PIDs
-kill -9 <pid1> <pid2>
+ssh ryan@192.168.86.33 "lsof /dev/ttyUSBx"   # find conflicting PIDs
+ssh ryan@192.168.86.33 "kill -9 <pid1> <pid2>"
 ```
 
 ### Encoder showing 0.0 forever

@@ -1,5 +1,5 @@
 # Session Notes — For Future Claude Sessions
-**Last updated: 2026-02-21 (session 4)**
+**Last updated: 2026-02-22 (session 5)**
 **Read this at the start of every session. It covers everything done so far.**
 
 ---
@@ -333,6 +333,27 @@ Most likely cause: VCC wire disconnected. Right encoder VCC → Pi 3.3V (physica
 Two known causes:
 1. **EKF publishing TF with gaps** → Set `publish_tf: false` in ekf.yaml, let motor controller own TF
 2. **Multiple node instances** → Kill everything and relaunch once clean
+
+---
+
+## Session 5 Notes (2026-02-22)
+
+### Claude Code now runs on dev machine
+- **Claude Code will be invoked from `ryan@dev:~/dev_ws`** going forward
+- Dev machine: `ryan@192.168.86.52`
+- Pi accessed via SSH: `ssh ryan@192.168.86.33`
+
+### SSH key auth set up (bidirectional)
+- Pi → Dev: Pi's existing key (`~/.ssh/id_ed25519`) added to dev's `~/.ssh/authorized_keys`
+  (served key over HTTP from Pi using `python3 -m http.server 9999`, fetched with curl on dev)
+- Dev → Pi: Dev's existing key (`~/.ssh/id_ed25519`) fetched via SSH and added to Pi's `~/.ssh/authorized_keys`
+- Both directions tested and working with no password prompt
+
+### CLAUDE.md created
+- Added `CLAUDE.md` to repo root (`src/my_package/CLAUDE.md`)
+- Contains session protocol, hardware reference, key files, TF tree, build/launch commands, and troubleshooting
+- Updated to reflect Claude running on dev machine (SSH commands for Pi operations)
+- Committed and pushed to `Dasovon/my_package` main
 
 ---
 
