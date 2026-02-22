@@ -7,14 +7,20 @@
 
 ---
 
+## File Roles
+
+**`CLAUDE.md` (this file)** — Claude Code instructions. Contains stable project context: hardware reference, key files, TF tree, build/launch commands, common fixes. Update this when hardware changes, new fixes are confirmed stable, or project structure changes.
+
+**`docs/SESSION_NOTES.md`** — Hand-off notes between sessions. Written by Claude at the end of each session for the next Claude to read. Contains what was done this session, what changed, problems found, and what to work on next. Not a permanent log — overwrite/rewrite it each session with what's currently relevant.
+
 ## Session Protocol
 
 **At the start of every session:**
 - Read `~/dev_ws/src/my_package/docs/SESSION_NOTES.md` in full before doing anything else.
 
 **At the end of every session:**
-- Update `~/dev_ws/src/my_package/docs/SESSION_NOTES.md` with what was done, what changed, any new problems/fixes discovered, and what's left for next session.
-- Update this file (`CLAUDE.md`) to reflect any changes to hardware, key files, build steps, or common fixes.
+- Rewrite `~/dev_ws/src/my_package/docs/SESSION_NOTES.md` with: what was done, what changed, any new problems/fixes, and what to work on next session. Keep it concise and current — it is notes for the next session, not a historical log.
+- Update this file (`CLAUDE.md`) if hardware changed, new stable fixes were found, or key files changed.
 - Commit and push both files.
 
 ---
