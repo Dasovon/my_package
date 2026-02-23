@@ -93,7 +93,7 @@ ros2 run nav2_map_server map_saver_cli -f ~/dev_ws/src/my_package/maps/my_map
 1. **Get a clean SLAM map** — drive the full room, save it, replace `maps/my_map.*`
 2. **Test Nav2 with new map** — set pose estimate in rviz2, verify scan aligns, send goal
 3. **Motor controller velocity timeout** — already implemented (1s watchdog in `watchdog_check()`). No changes needed.
-4. **Reconcile git branches** — dev is on `master`, remote has `main`. Merge or rebase.
+4. ~~**Reconcile git branches**~~ — Done. Merged into `main`, deleted `master`. Local and remote both on `main` now.
 
 ---
 
