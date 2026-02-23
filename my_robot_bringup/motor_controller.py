@@ -15,6 +15,7 @@ Differential drive motor controller with hall effect encoders.
 
 import math
 import os
+import signal
 
 import rclpy
 import RPi.GPIO as GPIO
@@ -551,9 +552,16 @@ def main(args=None):
     rclpy.init(args=args)
     node = MotorController()
 
+    # SIGTERM (kill <pid>) does not trigger finally blocks by default in Python.
+    # Raise SystemExit so the finally block runs and GPIO is cleaned up.
+    def handle_sigterm(signum, frame):
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass
     finally:
         node.cleanup()
