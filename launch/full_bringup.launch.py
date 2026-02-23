@@ -69,11 +69,15 @@ def generate_launch_description():
         ),
 
         # BNO055 IMU
+        # Remap imu/imu -> imu/data to match ROS convention and EKF config.
+        # The bno055 driver publishes to <prefix>imu (= imu/imu with prefix "imu/")
+        # but robot_localization EKF expects /imu/data.
         Node(
             package='bno055',
             executable='bno055',
             name='bno055',
             parameters=[os.path.join(pkg_dir, 'config', 'bno055.yaml')],
+            remappings=[('imu/imu', 'imu/data')],
         ),
 
         # Static transform: base_link -> imu_link

@@ -4,7 +4,7 @@ bno055:
     i2c_bus: 1                    # Raspberry Pi I2C bus 1
     i2c_addr: 0x28
     frame_id: "imu_link"
-    ros_topic_prefix: "imu/"     # Publishes to /imu/data, /imu/imu, etc.
+    ros_topic_prefix: "imu/"     # Publishes to /imu/imu, /imu/imu_raw, etc. (remapped to /imu/data in launch)
     operation_mode: 0x0C         # NDOF - full 9-DOF sensor fusion
     placement_axis_remap: "P1"   # Flat mount, chip facing up
     data_query_frequency: 100    # 100 Hz
