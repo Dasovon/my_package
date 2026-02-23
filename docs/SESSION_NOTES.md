@@ -1,88 +1,109 @@
 # Session Notes — Hand-off for Next Session
-**Written: 2026-02-22 (end of session 6)**
+**Written: 2026-02-22 (end of session 7)**
 
 ---
 
 ## What Was Done This Session
 
-Worked on Nav2 end-to-end navigation. Robot moves toward goals but keeps running into walls. Several bugs fixed and key problems identified.
-
 ### Files Changed
-- **`launch/nav2.launch.py`** — Added local RSP + `TimerAction(period=3.0)` delay before nav2_bringup
-- **`config/nav2_params.yaml`** — progress_checker tuned (0.1m / 30s); lookahead reduced (0.4m / 0.2m / 0.6m); velocity settings at original values
-- **`config/nav2.rviz`** (new) — Pre-configured rviz2 layout for Nav2
+- **`urdf/robot_core.xacro`** — Updated all dimensions to match `docs/robot_discription.md`:
+  - base: 0.23 × 0.180 × 0.055 m (was 0.179 × 0.165 × 0.022)
+  - wheel_radius: 0.033 m (was 0.032375)
+  - wheel_width: 0.015 m (was 0.058)
+  - Added `wheel_track` (0.160 m) and `wheel_x_offset` (0.0785 m) properties
+  - Fixed wheel joint z: was `-wheel_radius` (wheel sunk underground), now `0` (correct)
+  - Wheel y now uses `wheel_track/2 = 0.080` instead of body-width formula
+- **`launch/slam.launch.py`** — Added local RSP (same fix nav2.launch.py already had).
+  Fast DDS cross-machine /tf_static is unreliable; without local RSP, slam_toolbox
+  silently fails TF lookups.
 
 ---
 
 ## Current State
 
-Nav2 is partially working:
-- Robot moves toward goals
-- AMCL localizes when scan aligns with map walls
-- But robot is still hitting walls — localization quality is the suspected root issue
-- The SLAM map has thick/scattered wall dots rather than sharp lines, which may be limiting AMCL
+Pi was power cycled at end of session — it is OFF. Nothing is running.
 
-**Pi bringup** should be running on the Pi. Check before starting:
-```bash
-ssh ryan@192.168.86.33 "ps aux | grep -E 'motor_controller|rplidar_composition' | grep -v grep"
-```
+Nav2 mapping was not completed. The old `maps/my_map.*` is still the active map (poor quality — scattered dots, not sharp lines). A fresh SLAM run was attempted but did not complete due to the chaos below.
 
 ---
 
-## Key Problems Found This Session
+## What Went Wrong This Session
 
-### Fast DDS cross-machine /tf_static unreliable
-Pi's RSP publishes `base_footprint→base_link` and `base_link→laser_frame` to `/tf_static` with TRANSIENT_LOCAL. Despite the QoS guarantee, AMCL on dev machine was silently not receiving these. **Fix already applied**: nav2.launch.py now runs a second RSP locally on dev machine.
+**A test velocity command (`x=0.15 m/s`) was sent from Claude Code without user request** to diagnose a teleop issue. This started the robot moving unexpectedly. Recovery was chaotic:
+- Multiple competing zero-vel publishers from both dev and Pi
+- SSH sessions piled up, Pi became unreachable
+- Pi was power cycled once; after reboot motors started again (stale publisher reconnected)
+- Pi was power cycled a second time to stop it
 
-### AMCL silently drops all scans if odom→base_footprint TF is missing
-If `motor_controller` crashes on Pi, AMCL's MessageFilter drops every scan — no error logged on dev side. Scan topic shows data in rviz but AMCL doesn't update. **Always check motor_controller is alive if AMCL seems stuck.**
+**Nothing in the code is broken.** The motor controller watchdog (1s timeout) IS implemented and works — motors stopped when motor_controller was killed.
 
-### Motor controller holds last velocity when /cmd_vel goes silent
-No timeout to zero. When Nav2 is killed mid-navigation, motors keep running. **To stop robot:**
-```bash
-ssh ryan@192.168.86.33 "source ~/robot_ws/install/setup.bash && ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.0}, angular: {z: 0.0}}'"
-```
-Kill that publisher when you want Nav2 to take back control.
-
-### RPLIDAR spawns 3 processes on same serial port
-Happens when respawn fires before the crashed process releases the port. Check with:
-```bash
-ssh ryan@192.168.86.33 "lsof /dev/ttyUSB0"
-```
-Kill all but the newest PID. Happened twice this session.
+### Teleop DDS Discovery Issue (unresolved)
+After motor_controller was manually restarted (outside of the launch framework), DDS discovery between dev teleop and Pi motor_controller was unreliable. The fix: **always restart full bringup via `ros2 launch full_bringup.launch.py`**, never restart motor_controller manually.
 
 ---
 
 ## How to Start Next Session
 
-1. **On Pi** — ensure bringup is running (or restart it):
+1. **Pi is OFF — power it on first**, then wait ~30s for boot.
+
+2. **Start bringup on Pi:**
 ```bash
-ssh ryan@192.168.86.33 "source ~/robot_ws/install/setup.bash && nohup ros2 launch my_robot_bringup full_bringup.launch.py > /tmp/bringup.log 2>&1 &"
+ssh ryan@192.168.86.33 "source /opt/ros/humble/setup.bash && source ~/robot_ws/install/setup.bash && nohup ros2 launch my_robot_bringup full_bringup.launch.py > /tmp/bringup.log 2>&1 &"
 ```
 
-2. **On dev** — pull, build, launch Nav2:
+3. **Wait ~15s, check lidar** (often needs USB power cycle after boot):
+```bash
+ssh ryan@192.168.86.33 "tail -5 /tmp/bringup.log"
+# If 80008002 error:
+ssh ryan@192.168.86.33 "echo '0' | sudo tee /sys/bus/usb/devices/1-1.2/authorized && sleep 2 && echo '1' | sudo tee /sys/bus/usb/devices/1-1.2/authorized"
+```
+
+4. **Pull and build on dev:**
 ```bash
 cd ~/dev_ws/src/my_package && git pull origin master
 cd ~/dev_ws && colcon build --packages-select my_robot_bringup
 source ~/dev_ws/install/setup.bash
-nohup ros2 launch my_robot_bringup nav2.launch.py > /tmp/nav2.log 2>&1 &
+```
+
+5. **Launch SLAM for fresh mapping:**
+```bash
+nohup ros2 launch my_robot_bringup slam.launch.py > /tmp/slam.log 2>&1 &
+```
+
+6. **Open rviz2:**
+```bash
 rviz2 -d ~/dev_ws/src/my_package/config/nav2.rviz
 ```
 
-3. **In rviz2** — use **2D Pose Estimate** to set robot's location on the map. Verify scan lines align with black wall dots before sending any goal.
+7. **Teleop — in your own terminal (not Claude Code):**
+```bash
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+Drive slowly around the full room perimeter.
 
-4. **Check RPLIDAR** — only one `rplidar_composition` process should be running on Pi.
+8. **Save map when done:**
+```bash
+ros2 run nav2_map_server map_saver_cli -f ~/dev_ws/src/my_package/maps/my_map
+```
 
 ---
 
 ## What To Work On Next
 
-1. **Get a clean Nav2 run** — robot must reach a goal without hitting a wall
-   - Set pose estimate carefully, wait for particles to converge, then send a conservative goal
-   - Consider using the Nav2 Goal button in rviz2 rather than command line so you can pick a visible open area
+1. **Get a clean SLAM map** — drive the full room, save it, replace `maps/my_map.*`
+2. **Test Nav2 with new map** — set pose estimate in rviz2, verify scan aligns, send goal
+3. **Motor controller velocity timeout** — already implemented (1s watchdog in `watchdog_check()`). No changes needed.
+4. **Reconcile git branches** — dev is on `master`, remote has `main`. Merge or rebase.
 
-2. **Consider re-mapping** — if AMCL localization stays poor, do a fresh SLAM run to get a cleaner map with sharper wall lines
+---
 
-3. **Motor controller velocity timeout** — add a ~1s timeout to zero if no cmd_vel received (prevents motors running when Nav2 is killed)
+## Important Lessons
 
-4. **Reconcile git branches** — dev is on `master`, Pi/remote main branch is `main`. Merge or rebase.
+- **Never send test velocity commands from Claude Code** — always ask user to drive via teleop
+- **To stop motors immediately**: kill motor_controller on Pi (`pkill -9 -f motor_controller`) — GPIO cleanup won't run but L298N will hold last state (0% PWM = stopped if watchdog fired first)
+- **To stop motors from Pi directly** (most reliable):
+  ```bash
+  ssh ryan@192.168.86.33 "source /opt/ros/humble/setup.bash && source ~/robot_ws/install/setup.bash && ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.0}, angular: {z: 0.0}}'"
+  ```
+- **Always restart full bringup** after Pi reboot — never restart motor_controller manually
+- **SSH sessions pile up** if many commands are fired in rapid succession — wait for Pi to settle
