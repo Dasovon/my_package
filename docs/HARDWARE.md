@@ -7,18 +7,15 @@ Complete hardware specifications, wiring, motor configuration, and software depe
 ## Robot Physical Specifications
 
 ### Chassis (URDF)
-- **Base length:** 0.179 m
-- **Base width:** 0.165 m
-- **Base height:** 0.022 m
+- **Base length:** 0.23 m
+- **Base width:** 0.180 m
+- **Base height:** 0.055 m
 - **Base mass (URDF placeholder):** 5.0 kg
 
 ### Wheels
-- **Wheel radius:** 0.032375 m
-- **Wheel diameter:** 0.06475 m
-- **Wheel width:** 0.058 m
-- **Wheel base (physical center-to-center):** 0.165 m
-- **Wheel base (effective, calibrated):** 0.236 m — use this in software
-- **Wheel circumference:** 0.2034 m
+- **Wheel radius:** 0.0325 m
+- **Wheel width:** 0.015 m
+- **Wheel base (physical center-to-center):** 0.160 m
 
 ### Encoders (DG01D-E)
 - **Resolution:** 288 ticks per wheel revolution (3 pulses x 2 edges x 48:1 gear ratio)
