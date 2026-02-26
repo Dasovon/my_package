@@ -10,12 +10,10 @@ Lidar watchdog node.
 Monitors /scan subscriber count and stops the RPLIDAR motor when nothing
 needs the scan data, then restarts it when a subscriber appears.
 
-Also automatically power cycles the RPLIDAR USB when a crash is detected,
-clearing the hardware bad state that causes 80008002/80008000 errors.
-
-Requires sudoers rule (run once on Pi):
-  echo 'ryan ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/bus/usb/devices/1-1.2/authorized' \
-    | sudo tee /etc/sudoers.d/lidar-power-cycle
+Also sends the RPLIDAR firmware reset command (0xA5 0x40) over serial when a
+crash is detected. This resets the RPLIDAR MCU (motor restarts, state cleared),
+fixing the 80008002 / "Failed to set scan mode" errors that occur when the motor
+is stopped and the node crashes. No sudo required — uses the serial port directly.
 
 This conserves battery during development/coding sessions when SLAM and
 rviz are not running.
@@ -24,7 +22,7 @@ A grace period prevents stop_motor from being called too soon after the
 rplidar node starts or restarts, which can cause SDK timeouts.
 """
 
-import subprocess
+import serial
 import time
 
 import rclpy
@@ -32,7 +30,8 @@ from rclpy.node import Node
 from std_srvs.srv import Empty
 
 GRACE_PERIOD_SEC = 8.0   # seconds to wait after rplidar comes up before stopping motor
-USB_DEVICE_PATH = '/sys/bus/usb/devices/1-1.2/authorized'
+LIDAR_PORT = '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0'
+RPLIDAR_RESET_CMD = bytes([0xA5, 0x40])
 
 
 class LidarWatchdog(Node):
@@ -53,12 +52,12 @@ class LidarWatchdog(Node):
         self._service_was_ready = False
         self._service_ready_since = None
 
-        # Cooldown to avoid power cycling repeatedly in quick succession
-        self._last_power_cycle = 0.0
+        # Cooldown to avoid resetting repeatedly in quick succession
+        self._last_reset = 0.0
 
-        # Startup timeout: power cycle if service never comes up within 20s
+        # Startup timeout: reset firmware if service never comes up within 20s
         self._startup_time = time.monotonic()
-        self._startup_power_cycle_done = False
+        self._startup_reset_done = False
 
         self.create_timer(2.0, self._check)
         self.get_logger().info('Lidar watchdog started')
@@ -68,8 +67,8 @@ class LidarWatchdog(Node):
 
         # Detect crash: service was available, now gone
         if self._service_was_ready and not service_ready:
-            self.get_logger().warn('RPLIDAR crashed — power cycling USB')
-            self._power_cycle_usb()
+            self.get_logger().warn('RPLIDAR crashed — sending firmware reset')
+            self._reset_lidar_firmware()
 
         # Detect recovery: service transitions from unavailable to available
         if service_ready and not self._service_was_ready:
@@ -79,14 +78,14 @@ class LidarWatchdog(Node):
 
         self._service_was_ready = service_ready
 
-        # Startup timeout: if the service has never come up after 20s, power cycle.
+        # Startup timeout: if the service has never come up after 20s, reset firmware.
         # This handles the case where rplidar crashes immediately on startup (before
         # its service ever becomes available), which the crash detector above misses.
-        if self._service_ready_since is None and not self._startup_power_cycle_done:
+        if self._service_ready_since is None and not self._startup_reset_done:
             if time.monotonic() - self._startup_time > 20.0:
-                self.get_logger().warn('RPLIDAR failed to start in 20s — power cycling USB')
-                self._power_cycle_usb()
-                self._startup_power_cycle_done = True
+                self.get_logger().warn('RPLIDAR failed to start in 20s — sending firmware reset')
+                self._reset_lidar_firmware()
+                self._startup_reset_done = True
 
         if not service_ready:
             return
@@ -105,32 +104,28 @@ class LidarWatchdog(Node):
             self._call(self._stop_client, 'stop')
             self._motor_running = False
 
-    def _power_cycle_usb(self):
+    def _reset_lidar_firmware(self):
+        """Send the RPLIDAR firmware reset command over serial.
+
+        Resets the RPLIDAR MCU directly — motor restarts and state clears.
+        This is the software equivalent of a power cycle for the RPLIDAR firmware.
+        No sudo required; uses the dialout-accessible serial port.
+        """
         now = time.monotonic()
-        if now - self._last_power_cycle < 10.0:
-            self.get_logger().info('Power cycle skipped (cooldown)')
+        if now - self._last_reset < 10.0:
+            self.get_logger().info('Firmware reset skipped (cooldown)')
             return
-        self._last_power_cycle = now
+        self._last_reset = now
 
         try:
-            subprocess.run(
-                ['sudo', 'tee', USB_DEVICE_PATH],
-                input='0', text=True, capture_output=True, check=True
-            )
-            time.sleep(2.0)
-            subprocess.run(
-                ['sudo', 'tee', USB_DEVICE_PATH],
-                input='1', text=True, capture_output=True, check=True
-            )
-            self.get_logger().info('USB power cycle complete')
-        except subprocess.CalledProcessError as e:
-            self.get_logger().error(
-                f'USB power cycle failed: {e}\n'
-                'Run this once to fix:\n'
-                "  echo 'ryan ALL=(ALL) NOPASSWD: /usr/bin/tee "
-                "/sys/bus/usb/devices/1-1.2/authorized' "
-                '| sudo tee /etc/sudoers.d/lidar-power-cycle'
-            )
+            with serial.Serial(LIDAR_PORT, 115200, timeout=1) as port:
+                port.reset_input_buffer()
+                port.reset_output_buffer()
+                port.write(RPLIDAR_RESET_CMD)
+                self.get_logger().info('RPLIDAR firmware reset command sent — waiting 2s')
+                time.sleep(2.0)
+        except serial.SerialException as e:
+            self.get_logger().error(f'RPLIDAR firmware reset failed: {e}')
 
     def _call(self, client, action):
         if not client.service_is_ready():

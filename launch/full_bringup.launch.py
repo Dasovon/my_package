@@ -22,10 +22,28 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+
+# Serial port path for RPLIDAR reset command
+_LIDAR_PORT = (
+    '/dev/serial/by-id/'
+    'usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0'
+)
+
+# Inline Python: flush serial buffers and send RPLIDAR firmware reset (0xA5 0x40).
+# This resets the RPLIDAR MCU so the motor starts clean on every bringup,
+# preventing the 80008002 / "Failed to set scan mode" crash loop.
+_LIDAR_RESET_CMD = (
+    'import serial, time; '
+    f'p = serial.Serial("{_LIDAR_PORT}", 115200, timeout=1); '
+    'p.reset_input_buffer(); p.reset_output_buffer(); '
+    'p.write(bytes([0xA5, 0x40])); '
+    'print("RPLIDAR firmware reset sent"); '
+    'time.sleep(2); p.close()'
+)
 
 
 def generate_launch_description():
@@ -61,11 +79,22 @@ def generate_launch_description():
             }.items(),
         ),
 
-        # RPLIDAR A1 (laser scan)
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(pkg_dir, 'launch', 'rplidar.launch.py'),
-            ),
+        # RPLIDAR A1: send firmware reset over serial before starting the node.
+        # Clears bad state (motor stopped, mid-scan) left from the previous session.
+        # The rplidar node is delayed 3s to give the firmware time to reinitialize.
+        ExecuteProcess(
+            cmd=['python3', '-c', _LIDAR_RESET_CMD],
+            output='screen',
+        ),
+        TimerAction(
+            period=3.0,
+            actions=[
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(
+                        os.path.join(pkg_dir, 'launch', 'rplidar.launch.py'),
+                    ),
+                ),
+            ],
         ),
 
         # BNO055 IMU
